@@ -174,6 +174,9 @@ Deno.serve(async (req) => {
         });
       };
 
+      // Emit session event first so the client can use it for reconnect/resume
+      sendEvent({ type: "session", sessionId: session.id, resumed: !!resume });
+
       try {
         // Call Lovable AI Gateway (OpenAI-compatible, supports streaming Gemini)
         const aiResponse = await fetch(
