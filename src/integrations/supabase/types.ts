@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sessions: {
         Row: {
           completed_at: string | null
@@ -121,26 +148,32 @@ export type Database = {
       users: {
         Row: {
           api_key: string
+          auth_user_id: string | null
           balance_usdc: number | null
           circle_wallet_id: string
           created_at: string | null
           id: string
+          revoked_at: string | null
           total_spent_usdc: number | null
         }
         Insert: {
           api_key: string
+          auth_user_id?: string | null
           balance_usdc?: number | null
           circle_wallet_id: string
           created_at?: string | null
           id?: string
+          revoked_at?: string | null
           total_spent_usdc?: number | null
         }
         Update: {
           api_key?: string
+          auth_user_id?: string | null
           balance_usdc?: number | null
           circle_wallet_id?: string
           created_at?: string | null
           id?: string
+          revoked_at?: string | null
           total_spent_usdc?: number | null
         }
         Relationships: []
@@ -155,6 +188,17 @@ export type Database = {
           total_transactions: number | null
           total_usdc_settled: number | null
           total_users: number | null
+        }
+        Relationships: []
+      }
+      leaderboard: {
+        Row: {
+          auth_user_id: string | null
+          avatar_url: string | null
+          display_name: string | null
+          total_settlements: number | null
+          total_tokens: number | null
+          total_usdc_spent: number | null
         }
         Relationships: []
       }

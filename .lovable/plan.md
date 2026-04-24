@@ -1,54 +1,96 @@
-## Goal
+# PromptPay v2 — Auth, Health, Resilience & Full Button Audit
 
-Make sure every button in PromptPay does real work against the backend. No dead clicks, no placeholder handlers, no buttons that only update local state when they should also persist or call an API.
+Make every button in the app provably wired to a working backend endpoint with consistent error handling, automatic retries, and SSE auto-reconnect. Add Email + Google login/logout so each user owns their own API keys, plus a live health indicator in the header.
 
-## Current button audit
+Note on AI: the chat backend already uses **Lovable AI Gateway** (`google/gemini-2.5-flash`) — no Google Gemini API key is needed or used. We'll keep that and clarify it in Docs.
 
-| Location | Button | Status | Action |
-|---|---|---|---|
-| ChatPanel | `+ Create Account` | Working — calls `/create-wallet` | Keep, add copy-to-clipboard on returned key |
-| ChatPanel | `Send →` | Working — SSE to `/chat` | Keep |
-| ChatPanel | `Reset` | Local-only (clears messages) | Upgrade: also call new `/end-session` to mark active session `completed` and clear server-side draft |
-| ChatPanel | API Key / Gateway URL inputs | Working (localStorage) | Add `Save` + `Test` button that pings `/verify-key` |
-| Dashboard header | `API Docs →` link | Working | Keep |
-| SettlementFeed | TX id text | Not a button | Make it a button → copies `circle_transfer_id` to clipboard, toast confirm |
-| StatsBar cards | None | — | Add `Refresh` button that re-queries `global_stats` view |
-| Docs page | `← Back` link | Working | Keep |
-| Docs page | Code blocks | Not buttons | Add `Copy` button on every code block |
-| EconomicProof | None | — | Add `Recalculate from live data` button → fetches real settlement count from DB and re-renders the verdict line |
-| NotFound | None | — | Add `Go home` button |
+---
 
-## Backend work (Lovable Cloud edge functions)
+## 1. Authentication (new)
 
-1. **`verify-key`** (new) — `POST` with `X-API-Key`. Looks up `users` row, returns `{ valid, balance_usdc, total_spent_usdc }`. Used by the new "Test key" button.
-2. **`end-session`** (new) — `POST` with `X-API-Key`. Marks the user's most recent `active` session as `completed` with `completed_at = now()`. Used by `Reset`.
-3. **`stats-snapshot`** (new) — `GET`. Returns the `global_stats` view as JSON (totals + highest settlement number + live settlement-count by chain for the EconomicProof "recalculate" button). Used by `Refresh` and `Recalculate`.
-4. **`chat` / `create-wallet`** — already deployed, no changes.
+Add Email/Password + Google sign-in via Lovable Cloud auth.
 
-All four functions: CORS enabled, `verify_jwt = false` in `supabase/config.toml` (anon-key + custom `X-API-Key` model already in use).
+- New `/auth` page: tabs for Sign In / Sign Up, Google button, "Forgot password" link
+- New `/reset-password` page (required for password recovery)
+- `useAuth` hook wrapping `supabase.auth.onAuthStateChange` + `getSession` (listener set up BEFORE getSession; no async work inside the callback)
+- Header: shows user email + Logout button when signed in; "Sign In" link when not
+- Dashboard becomes auth-gated; unauthenticated users are redirected to `/auth`
+- DB: new `profiles` table linked to `auth.users(id)` with `display_name`, `avatar_url`; trigger auto-creates profile on signup; RLS so users only see their own profile
+- DB: add `auth_user_id uuid` column to existing `users` table (the API-key/wallet table) and link each created wallet to the signed-in auth user. Enable RLS on `users`, `sessions`, `transactions` so a user only sees their own rows. (`global_stats` view stays public for the leaderboard.)
+- `create-wallet` edge function: now requires a JWT, reads `auth.uid()`, attaches it to the new `users` row
+- "My API Keys" panel on dashboard: list all keys for the current auth user, with Revoke button (soft-delete via `revoked_at` column) wired to a new `revoke-key` edge function
 
-## Frontend work
+Defaults: Email/Password + Google. Email confirmation OFF for hackathon demo speed (configurable later).
 
-- **`src/lib/api.ts`** — add `verifyKey()`, `endSession()`, `fetchStatsSnapshot()` helpers.
-- **`src/components/ChatPanel.tsx`**
-  - Add `Test` button next to API Key input → calls `verifyKey`, shows toast with balance.
-  - `Reset` now `await endSession()` then `chat.reset()`.
-  - After `Create Account`, show small `Copy key` button.
-- **`src/components/SettlementFeed.tsx`** — wrap TX id in a `<button>` that calls `navigator.clipboard.writeText` + toast.
-- **`src/components/StatsBar.tsx`** — add small `↻ Refresh` icon-button in corner that re-runs `useStats` fetch.
-- **`src/hooks/useStats.ts`** — expose a `refresh()` function that hits `stats-snapshot`.
-- **`src/components/EconomicProof.tsx`** — add `Recalculate from live data` button → updates verdict text using `stats-snapshot.highest_settlement_number`.
-- **`src/pages/Docs.tsx`** — wrap each `<Code>` in a component with a `Copy` button (top-right of the block).
-- **`src/pages/NotFound.tsx`** — add `Go home` button using `react-router` `<Link>`.
+## 2. Health check endpoint + live indicator
 
-## Out of scope
+- New edge function `health` (GET): pings DB (`select 1`), checks `LOVABLE_API_KEY` is set, returns `{ ok, db: "up"|"down", ai: "up"|"down", latencyMs, version, timestamp }`
+- New `useHealth` hook: polls `/health` every 15s, exposes `{ status, latencyMs, lastChecked }`
+- Header gets a new **HealthDot** component next to the existing realtime ConnectionStatus:
+  - Green pulse = all up
+  - Amber = degraded (one subsystem down)
+  - Red = down or unreachable
+  - Hover tooltip shows latency + last-checked timestamp + click-to-recheck
 
-The public-apis GitHub repo reference: confirmed via your answer to focus on button audit; no Public APIs Explorer page will be added in this pass.
+## 3. Resilient fetch + SSE reconnect
+
+New `src/lib/fetcher.ts`:
+- `fetchWithRetry(url, opts, { retries=3, backoff=exponential 500ms→4s, retryOn=[408,429,500,502,503,504,networkError] })`
+- Honors `Retry-After` header on 429
+- Surfaces final failure via toast + structured error
+- All button-triggered fetches (`createWallet`, `verifyKey`, `endSession`, `fetchStatsSnapshot`, `revokeKey`, `health`) routed through it
+
+`useChat` upgrade:
+- AbortController retained, but on non-user-aborted disconnect mid-stream, automatically reconnect up to 3 times with exponential backoff
+- Resume sends a `resume: true` flag + `sessionId` so the backend can continue the same session row instead of creating a new one
+- Toast: "Reconnecting stream… (attempt N/3)"
+- On final failure: red toast with Retry button that re-invokes `send`
+- `chat` edge function: accepts optional `sessionId` + `resume` to append to an existing session and continue settlement numbering
+
+## 4. Button audit — every interactive element
+
+| Component | Button | Wired to | Success state | Error state |
+|---|---|---|---|---|
+| Header | Logout | `supabase.auth.signOut` | Toast + redirect to /auth | Toast |
+| Header | HealthDot click | `health` (manual recheck) | Tooltip updates | Red dot + toast |
+| Auth | Sign In | `auth.signInWithPassword` | Redirect / + toast | Toast |
+| Auth | Sign Up | `auth.signUp` | Toast "check email" or auto-login | Toast |
+| Auth | Google | `auth.signInWithOAuth` | OAuth redirect | Toast |
+| Auth | Forgot password | `auth.resetPasswordForEmail` | Toast | Toast |
+| Reset password | Update | `auth.updateUser({password})` | Redirect /auth | Toast |
+| ChatPanel | Create Account | `create-wallet` (JWT) | Toast + Copy action | Toast |
+| ChatPanel | Test | `verify-key` | Toast w/ balance | Toast |
+| ChatPanel | Copy | clipboard | Toast | Toast |
+| ChatPanel | Send | `chat` SSE w/ retry | Stream tokens | Toast + Retry button |
+| ChatPanel | Reset | `end-session` then local clear | Toast | Toast (still resets local) |
+| My Keys | Revoke | `revoke-key` (new) | Toast + list refresh | Toast |
+| StatsBar | Refresh | `stats-snapshot` | Numbers animate | Toast |
+| EconomicProof | Recalc | `stats-snapshot` | Verdict updates | Toast |
+| SettlementFeed | TX id | clipboard | Toast | — |
+| SettlementFeed | Copy all | clipboard TSV | Toast | — |
+| Docs | Code Copy | clipboard | Toast | — |
+| Docs / NotFound | Back / Go home | router | navigation | — |
+
+Plus a **dev-only "Run health audit" button** in the footer that pings every endpoint sequentially and prints a green/red checklist toast — judges can click once to verify the whole stack.
+
+## 5. Hackathon polish
+
+- **Agent-to-Agent demo button** on dashboard: spawns a synthetic "agent" that calls `/chat` with the user's key, runs N micropayments back-to-back, proves machine-to-machine flow (aligns with Agent-to-Agent track)
+- **Public leaderboard** strip: top 5 users by total USDC settled (from `global_stats` joined w/ profiles), sourced from a new `leaderboard` view
+- **Burn-down graph** in EconomicProof: tiny sparkline of last 50 settlements (Recharts) so judges visually see the 50+ transaction requirement
+- Footer badges: "Built on Arc · Settled in USDC · Powered by Circle Nanopayments · Lovable Cloud"
+
+## 6. Technical details
+
+- New edge functions: `health`, `revoke-key`. Updates: `chat` (resume), `create-wallet` (JWT-bound). All keep `verify_jwt = false` except `create-wallet` and `revoke-key` which validate JWT in code via `supabase.auth.getUser(token)`.
+- Migrations: `profiles` table + trigger + RLS; add `auth_user_id` and `revoked_at` to `users`; enable RLS on `users`/`sessions`/`transactions` with `auth.uid()` policies; create `leaderboard` view.
+- `src/lib/fetcher.ts`, `src/hooks/useAuth.ts`, `src/hooks/useHealth.ts`, `src/components/HealthDot.tsx`, `src/components/MyKeys.tsx`, `src/components/AgentDemo.tsx`, `src/pages/Auth.tsx`, `src/pages/ResetPassword.tsx`, `src/components/ProtectedRoute.tsx`.
+- `useChat` gets reconnect loop + sessionId resume; existing UI surface unchanged except for new toasts.
 
 ## Acceptance
 
-- Clicking any button in the app triggers either a backend call, a navigation, or a clipboard write — verified in DevTools network tab.
-- `Reset` closes the active session row in the DB.
-- `Test` validates the API key against the `users` table.
-- `Copy` buttons all show a success toast.
-- `Refresh` and `Recalculate` re-fetch from the DB without reload.
+- Every button in the table above triggers a real network call (verifiable in DevTools) and renders a toast on success or failure.
+- Killing the network mid-stream and restoring it shows "Reconnecting…" and resumes the same session without losing settlement count.
+- Health dot turns red within 15s if the chat function is offline.
+- Logged-out users cannot reach the dashboard; logged-in users see only their own keys/sessions/transactions.
+- Demo flow: sign up → create wallet → send a long prompt → see ≥50 settlements stream in → click "Agent demo" → watch second wave → all green health dot throughout.
