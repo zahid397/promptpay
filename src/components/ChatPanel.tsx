@@ -5,13 +5,19 @@ import { useChat, type SettlementEvent } from "@/hooks/useChat";
 
 interface Props {
   onSessionStats: (s: { settlements: number; usdc: number }) => void;
+  apiKey?: string;
+  onApiKeyChange?: (k: string) => void;
 }
 
 const LS_KEY = "promptpay.apiKey";
 const LS_URL = "promptpay.gatewayUrl";
 
-export function ChatPanel({ onSessionStats }: Props) {
-  const [apiKey, setApiKey] = useState("");
+export function ChatPanel({ onSessionStats, apiKey: extKey, onApiKeyChange }: Props) {
+  const [apiKey, setApiKeyState] = useState("");
+  const setApiKey = (k: string) => {
+    setApiKeyState(k);
+    onApiKeyChange?.(k);
+  };
   const [gatewayUrl, setGatewayUrl] = useState(CHAT_URL);
   const [input, setInput] = useState("Explain pay-per-token billing in 4 sentences.");
   const [creating, setCreating] = useState(false);
@@ -22,9 +28,14 @@ export function ChatPanel({ onSessionStats }: Props) {
   useEffect(() => {
     const k = localStorage.getItem(LS_KEY);
     const u = localStorage.getItem(LS_URL);
-    if (k) setApiKey(k);
+    if (k) setApiKeyState(k);
     if (u) setGatewayUrl(u);
   }, []);
+
+  useEffect(() => {
+    if (extKey && extKey !== apiKey) setApiKeyState(extKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extKey]);
 
   useEffect(() => {
     if (apiKey) localStorage.setItem(LS_KEY, apiKey);
