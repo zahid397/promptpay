@@ -32,12 +32,11 @@ export function useStats(transactions: TxRow[]) {
     return () => clearInterval(id);
   }, []);
 
-  // Optimistic update from realtime tx feed
   useEffect(() => {
     if (transactions.length === 0) return;
     refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions.length]);
 
-  return stats;
+  return { ...stats, refresh: refetch };
 }
