@@ -37,10 +37,11 @@ Deno.serve(async (req) => {
     .from("users")
     .select("*")
     .eq("api_key", apiKey)
-    .single();
+    .is("revoked_at", null)
+    .maybeSingle();
 
   if (userError || !user) {
-    return new Response(JSON.stringify({ error: "Invalid API key" }), {
+    return new Response(JSON.stringify({ error: "Invalid or revoked API key" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -57,7 +58,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { messages, model = "gemini-2.0-flash" } = body;
+  const { messages, model = "gemini-2.0-flash", sessionId: resumeSessionId, resume } = body;
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return new Response(
       JSON.stringify({ error: "messages array required" }),
@@ -68,31 +69,44 @@ Deno.serve(async (req) => {
     );
   }
 
-  // 3. Create session
+  // 3. Create or resume session
   const promptPreview =
     messages[messages.length - 1]?.content?.slice(0, 100) || "";
-  const { data: session, error: sessionError } = await supabase
-    .from("sessions")
-    .insert({ user_id: user.id, model, prompt_preview: promptPreview })
-    .select()
-    .single();
 
-  if (sessionError || !session) {
-    return new Response(
-      JSON.stringify({ error: "Failed to create session" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+  let session: any = null;
+  if (resume && resumeSessionId) {
+    const { data: existing } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("id", resumeSessionId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (existing) session = existing;
+  }
+  if (!session) {
+    const { data: created, error: sessionError } = await supabase
+      .from("sessions")
+      .insert({ user_id: user.id, model, prompt_preview: promptPreview })
+      .select()
+      .single();
+    if (sessionError || !created) {
+      return new Response(
+        JSON.stringify({ error: "Failed to create session" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    session = created;
   }
 
-  // 4. SSE stream
+  // 4. SSE stream — when resuming, continue counters from the existing session
   const encoder = new TextEncoder();
-  let totalTokens = 0;
+  let totalTokens = resume && session ? Number(session.total_tokens || 0) : 0;
   let pendingTokens = 0;
-  let totalUsdcPaid = 0;
-  let settlementCount = 0;
+  let totalUsdcPaid = resume && session ? Number(session.total_usdc_paid || 0) : 0;
+  let settlementCount = resume && session ? Number(session.settlement_count || 0) : 0;
   let runningBalance = parseFloat(user.balance_usdc);
   let runningSpent = parseFloat(user.total_spent_usdc || 0);
 
@@ -159,6 +173,9 @@ Deno.serve(async (req) => {
           timestamp: new Date().toISOString(),
         });
       };
+
+      // Emit session event first so the client can use it for reconnect/resume
+      sendEvent({ type: "session", sessionId: session.id, resumed: !!resume });
 
       try {
         // Call Lovable AI Gateway (OpenAI-compatible, supports streaming Gemini)
