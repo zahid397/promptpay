@@ -42,17 +42,7 @@ const Auth = () => {
     }
   };
 
-  const handleGoogle = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: `${window.location.origin}/` },
-      });
-      if (error) throw error;
-    } catch (e: any) {
-      toast.error("Google sign-in failed", { description: e?.message });
-    }
-  };
+
 
   const handleForgot = async () => {
     if (!email) {
@@ -158,18 +148,7 @@ const Auth = () => {
           </button>
         </form>
 
-        <div className="my-4 flex items-center gap-3">
-          <div className="flex-1 border-t border-soft" />
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted">or</span>
-          <div className="flex-1 border-t border-soft" />
-        </div>
 
-        <button
-          onClick={handleGoogle}
-          className="w-full font-mono text-[11px] uppercase tracking-wider py-2.5 rounded-sm border border-soft text-foreground hover:border-cyan hover:text-cyan transition"
-        >
-          Continue with Google
-        </button>
 
         <div className="mt-6 text-center font-mono text-[10px] text-muted">
           By continuing you accept usage of Lovable Cloud · USDC settled on Arc
