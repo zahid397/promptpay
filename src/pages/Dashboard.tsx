@@ -5,6 +5,7 @@ import { StatsBar } from "@/components/StatsBar";
 import { ChatPanel } from "@/components/ChatPanel";
 import { SettlementFeed } from "@/components/SettlementFeed";
 import { EconomicProof } from "@/components/EconomicProof";
+import { EthFailsPanel } from "@/components/EthFailsPanel";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { HealthDot } from "@/components/HealthDot";
 import { MyKeys } from "@/components/MyKeys";
@@ -20,11 +21,11 @@ const Dashboard = () => {
   const { user } = useAuth();
   const { transactions, isConnected } = useRealtimeTx(50);
   const stats = useStats(transactions);
-  const [session, setSession] = useState({ settlements: 0, usdc: 0 });
+  const [session, setSession] = useState({ settlements: 0, usdc: 0, tokens: 0 });
   const [activeKey, setActiveKey] = useState<string>("");
 
   const handleSession = useCallback(
-    (s: { settlements: number; usdc: number }) => setSession(s),
+    (s: { settlements: number; usdc: number; tokens: number }) => setSession(s),
     []
   );
 
@@ -112,6 +113,7 @@ const Dashboard = () => {
         </div>
         <div className="space-y-4">
           <MyKeys onUseKey={setActiveKey} />
+          <EthFailsPanel sessionTokens={session.tokens} />
           <EconomicProof />
           <SettlementFeed transactions={transactions} />
           <Leaderboard />
