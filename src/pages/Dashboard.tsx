@@ -66,6 +66,7 @@ const Dashboard = () => {
           totalUsdc={stats.totalUsdc}
           totalTokens={stats.totalTokens}
           sessionUsdc={session.usdc}
+          onRefresh={stats.refresh}
         />
       </section>
 
