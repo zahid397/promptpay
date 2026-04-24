@@ -1,3 +1,6 @@
+import { supabase } from "@/integrations/supabase/client";
+import { fetchWithRetry, jsonFetch } from "./fetcher";
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
@@ -7,11 +10,17 @@ export const CREATE_WALLET_URL = `${FUNCTIONS_BASE}/create-wallet`;
 export const VERIFY_KEY_URL = `${FUNCTIONS_BASE}/verify-key`;
 export const END_SESSION_URL = `${FUNCTIONS_BASE}/end-session`;
 export const STATS_URL = `${FUNCTIONS_BASE}/stats-snapshot`;
+export const HEALTH_URL = `${FUNCTIONS_BASE}/health`;
+export const REVOKE_KEY_URL = `${FUNCTIONS_BASE}/revoke-key`;
 
-const baseHeaders = {
-  apikey: SUPABASE_ANON,
-  Authorization: `Bearer ${SUPABASE_ANON}`,
-};
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const jwt = data.session?.access_token ?? SUPABASE_ANON;
+  return {
+    apikey: SUPABASE_ANON,
+    Authorization: `Bearer ${jwt}`,
+  };
+}
 
 export interface CreateWalletResponse {
   success: boolean;
@@ -23,13 +32,15 @@ export interface CreateWalletResponse {
 }
 
 export async function createWallet(): Promise<CreateWalletResponse> {
-  const res = await fetch(CREATE_WALLET_URL, {
-    method: "POST",
-    headers: { ...baseHeaders, "Content-Type": "application/json" },
-    body: JSON.stringify({}),
-  });
-  if (!res.ok) throw new Error(`Failed to create wallet: ${await res.text()}`);
-  return res.json();
+  return jsonFetch<CreateWalletResponse>(
+    CREATE_WALLET_URL,
+    {
+      method: "POST",
+      headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    },
+    { toastLabel: "Create account" }
+  );
 }
 
 export interface VerifyKeyResponse {
@@ -43,20 +54,45 @@ export interface VerifyKeyResponse {
 }
 
 export async function verifyKey(apiKey: string): Promise<VerifyKeyResponse> {
-  const res = await fetch(VERIFY_KEY_URL, {
-    method: "POST",
-    headers: { ...baseHeaders, "Content-Type": "application/json", "X-API-Key": apiKey },
-  });
-  return res.json();
+  return jsonFetch<VerifyKeyResponse>(
+    VERIFY_KEY_URL,
+    {
+      method: "POST",
+      headers: {
+        ...(await authHeaders()),
+        "Content-Type": "application/json",
+        "X-API-Key": apiKey,
+      },
+    },
+    { toastLabel: "Verify key" }
+  );
 }
 
 export async function endSession(apiKey: string): Promise<{ success: boolean; closed: number }> {
-  const res = await fetch(END_SESSION_URL, {
-    method: "POST",
-    headers: { ...baseHeaders, "Content-Type": "application/json", "X-API-Key": apiKey },
-  });
-  if (!res.ok) throw new Error(`end-session: ${await res.text()}`);
-  return res.json();
+  return jsonFetch(
+    END_SESSION_URL,
+    {
+      method: "POST",
+      headers: {
+        ...(await authHeaders()),
+        "Content-Type": "application/json",
+        "X-API-Key": apiKey,
+      },
+    },
+    { toastLabel: "End session" }
+  );
+}
+
+export async function revokeKey(keyId: string): Promise<{ success: boolean }> {
+  return jsonFetch(
+    REVOKE_KEY_URL,
+    {
+      method: "POST",
+      headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+      body: JSON.stringify({ keyId }),
+    },
+    { toastLabel: "Revoke key" }
+  );
 }
 
 export interface StatsSnapshot {
@@ -78,11 +114,35 @@ export interface StatsSnapshot {
 }
 
 export async function fetchStatsSnapshot(): Promise<StatsSnapshot> {
-  const res = await fetch(STATS_URL, {
-    method: "GET",
-    headers: { ...baseHeaders },
-  });
-  if (!res.ok) throw new Error(`stats-snapshot: ${await res.text()}`);
+  return jsonFetch<StatsSnapshot>(
+    STATS_URL,
+    { method: "GET", headers: await authHeaders() },
+    { toastLabel: "Refresh stats" }
+  );
+}
+
+export interface HealthResponse {
+  ok: boolean;
+  status: "healthy" | "degraded" | "down";
+  version: string;
+  uptimeMs: number;
+  latencyMs: number;
+  checks: {
+    database: { status: "up" | "down"; latencyMs: number };
+    ai_gateway: { status: "up" | "down" };
+    realtime: { status: "up" | "down" };
+  };
+  timestamp: string;
+}
+
+export async function fetchHealth(): Promise<HealthResponse> {
+  // Don't toast on health check failures — handled by indicator color
+  const res = await fetchWithRetry(
+    HEALTH_URL,
+    { method: "GET", headers: await authHeaders() },
+    { retries: 1, baseDelayMs: 300 }
+  );
+  // 503 still returns valid JSON (degraded)
   return res.json();
 }
 
@@ -96,16 +156,22 @@ export async function streamChat(opts: {
   gatewayUrl?: string;
   messages: ChatMessage[];
   signal?: AbortSignal;
+  sessionId?: string;
+  resume?: boolean;
 }): Promise<Response> {
   const url = opts.gatewayUrl || CHAT_URL;
   return fetch(url, {
     method: "POST",
     headers: {
-      ...baseHeaders,
+      ...(await authHeaders()),
       "Content-Type": "application/json",
       "X-API-Key": opts.apiKey,
     },
-    body: JSON.stringify({ messages: opts.messages }),
+    body: JSON.stringify({
+      messages: opts.messages,
+      sessionId: opts.sessionId,
+      resume: opts.resume,
+    }),
     signal: opts.signal,
   });
 }
