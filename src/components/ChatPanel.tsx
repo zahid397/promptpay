@@ -4,7 +4,7 @@ import { CHAT_URL, createWallet, verifyKey, endSession } from "@/lib/api";
 import { useChat, type SettlementEvent } from "@/hooks/useChat";
 
 interface Props {
-  onSessionStats: (s: { settlements: number; usdc: number }) => void;
+  onSessionStats: (s: { settlements: number; usdc: number; tokens: number }) => void;
   apiKey?: string;
   onApiKeyChange?: (k: string) => void;
 }
@@ -61,8 +61,9 @@ export function ChatPanel({ onSessionStats, apiKey: extKey, onApiKeyChange }: Pr
     onSessionStats({
       settlements: chat.sessionSettlements,
       usdc: chat.sessionUsdcPaid,
+      tokens: chat.currentTokens,
     });
-  }, [chat.sessionSettlements, chat.sessionUsdcPaid, onSessionStats]);
+  }, [chat.sessionSettlements, chat.sessionUsdcPaid, chat.currentTokens, onSessionStats]);
 
   useEffect(() => {
     if (scrollRef.current) {
