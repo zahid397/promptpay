@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { toast } from "sonner";
 import { streamChat, type ChatMessage } from "@/lib/api";
 
 export interface SettlementEvent {
@@ -22,21 +23,107 @@ export interface UseChatOptions {
   onError?: (msg: string) => void;
 }
 
+const MAX_RECONNECTS = 3;
+
 export function useChat(opts: UseChatOptions = {}) {
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [currentTokens, setCurrentTokens] = useState(0);
   const [sessionUsdcPaid, setSessionUsdcPaid] = useState(0);
   const [sessionSettlements, setSessionSettlements] = useState(0);
   const [latestSettlement, setLatestSettlement] = useState<SettlementEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
+  const lastCtxRef = useRef<{ apiKey: string; gatewayUrl?: string; history: ChatMessage[] } | null>(null);
+
+  const handleEvent = (evt: any, aiMsgId: string) => {
+    if (evt.type === "session") {
+      sessionIdRef.current = evt.sessionId;
+    } else if (evt.type === "token") {
+      setCurrentTokens(evt.totalTokens);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === aiMsgId ? { ...m, content: m.content + evt.text } : m))
+      );
+    } else if (evt.type === "settlement") {
+      const s: SettlementEvent = {
+        settlementNumber: evt.settlementNumber,
+        tokens: evt.tokens,
+        usdcAmount: evt.usdcAmount,
+        totalUsdcPaid: evt.totalUsdcPaid,
+        totalTokens: evt.totalTokens,
+        transferId: evt.transferId,
+        timestamp: evt.timestamp,
+      };
+      setLatestSettlement(s);
+      setSessionSettlements(s.settlementNumber);
+      setSessionUsdcPaid(parseFloat(s.totalUsdcPaid));
+      setMessages((prev) =>
+        prev.map((m) => (m.id === aiMsgId ? { ...m, settlements: [...m.settlements, s] } : m))
+      );
+      opts.onSettlement?.(s);
+    } else if (evt.type === "error") {
+      setError(evt.message);
+      opts.onError?.(evt.message);
+    }
+  };
+
+  const runStream = async (
+    aiMsgId: string,
+    ctx: { apiKey: string; gatewayUrl?: string; history: ChatMessage[] },
+    resume = false
+  ): Promise<{ ok: boolean; userAborted: boolean }> => {
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    const res = await streamChat({
+      apiKey: ctx.apiKey,
+      gatewayUrl: ctx.gatewayUrl,
+      messages: ctx.history,
+      signal: ac.signal,
+      sessionId: sessionIdRef.current ?? undefined,
+      resume,
+    });
+
+    if (!res.ok || !res.body) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(txt || `HTTP ${res.status}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) return { ok: true, userAborted: false };
+        buffer += decoder.decode(value, { stream: true });
+
+        let idx = buffer.indexOf("\n\n");
+        while (idx !== -1) {
+          const event = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          idx = buffer.indexOf("\n\n");
+
+          const dataLine = event.split("\n").find((l) => l.startsWith("data: "));
+          if (!dataLine) continue;
+          try {
+            handleEvent(JSON.parse(dataLine.slice(6)), aiMsgId);
+          } catch {
+            /* skip */
+          }
+        }
+      }
+    } catch (e: any) {
+      if (e?.name === "AbortError") return { ok: false, userAborted: true };
+      throw e;
+    }
+  };
 
   const send = useCallback(
-    async (
-      userText: string,
-      ctx: { apiKey: string; gatewayUrl?: string }
-    ) => {
+    async (userText: string, ctx: { apiKey: string; gatewayUrl?: string }) => {
       if (!userText.trim() || streaming) return;
       if (!ctx.apiKey) {
         setError("Add an API key first (or click Create Account)");
@@ -48,6 +135,7 @@ export function useChat(opts: UseChatOptions = {}) {
       setSessionUsdcPaid(0);
       setSessionSettlements(0);
       setLatestSettlement(null);
+      sessionIdRef.current = null;
 
       const userMsg: UiMessage = {
         id: crypto.randomUUID(),
@@ -68,117 +156,68 @@ export function useChat(opts: UseChatOptions = {}) {
         { role: "user", content: userText },
       ];
 
+      lastCtxRef.current = { apiKey: ctx.apiKey, gatewayUrl: ctx.gatewayUrl, history };
       setMessages((prev) => [...prev, userMsg, aiMsg]);
       setStreaming(true);
 
-      const ac = new AbortController();
-      abortRef.current = ac;
-
-      try {
-        const res = await streamChat({
-          apiKey: ctx.apiKey,
-          gatewayUrl: ctx.gatewayUrl,
-          messages: history,
-          signal: ac.signal,
-        });
-
-        if (!res.ok || !res.body) {
-          const txt = await res.text();
-          throw new Error(txt || `HTTP ${res.status}`);
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          let idx = buffer.indexOf("\n\n");
-          while (idx !== -1) {
-            const event = buffer.slice(0, idx);
-            buffer = buffer.slice(idx + 2);
-            idx = buffer.indexOf("\n\n");
-
-            const dataLine = event
-              .split("\n")
-              .find((l) => l.startsWith("data: "));
-            if (!dataLine) continue;
-            const json = dataLine.slice(6);
-            try {
-              const evt = JSON.parse(json);
-              handleEvent(evt, aiMsg.id);
-            } catch {
-              /* ignore */
-            }
+      let attempt = 0;
+      let resume = false;
+      while (true) {
+        try {
+          const result = await runStream(aiMsg.id, lastCtxRef.current!, resume);
+          if (result.userAborted) break;
+          break; // completed
+        } catch (e: any) {
+          attempt++;
+          if (attempt > MAX_RECONNECTS) {
+            const msg = e?.message || "Stream failed";
+            setError(msg);
+            opts.onError?.(msg);
+            toast.error("Stream failed", {
+              description: msg,
+              action: {
+                label: "Retry",
+                onClick: () => void send(userText, ctx),
+              },
+            });
+            break;
           }
+          const wait = Math.min(500 * 2 ** (attempt - 1), 4000);
+          setReconnecting(true);
+          toast.warning(`Reconnecting stream… (${attempt}/${MAX_RECONNECTS})`, {
+            description: `Resuming session in ${Math.round(wait / 100) / 10}s`,
+          });
+          await new Promise((r) => setTimeout(r, wait));
+          resume = !!sessionIdRef.current;
         }
-      } catch (e: any) {
-        if (e.name === "AbortError") return;
-        const msg = e?.message || "Stream failed";
-        setError(msg);
-        opts.onError?.(msg);
-      } finally {
-        setStreaming(false);
-        setMessages((prev) =>
-          prev.map((m) => (m.id === aiMsg.id ? { ...m, streaming: false } : m))
-        );
-        abortRef.current = null;
       }
+
+      setReconnecting(false);
+      setStreaming(false);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === aiMsg.id ? { ...m, streaming: false } : m))
+      );
+      abortRef.current = null;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [messages, streaming]
   );
 
-  const handleEvent = (evt: any, aiMsgId: string) => {
-    if (evt.type === "token") {
-      setCurrentTokens(evt.totalTokens);
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === aiMsgId ? { ...m, content: m.content + evt.text } : m
-        )
-      );
-    } else if (evt.type === "settlement") {
-      const s: SettlementEvent = {
-        settlementNumber: evt.settlementNumber,
-        tokens: evt.tokens,
-        usdcAmount: evt.usdcAmount,
-        totalUsdcPaid: evt.totalUsdcPaid,
-        totalTokens: evt.totalTokens,
-        transferId: evt.transferId,
-        timestamp: evt.timestamp,
-      };
-      setLatestSettlement(s);
-      setSessionSettlements(s.settlementNumber);
-      setSessionUsdcPaid(parseFloat(s.totalUsdcPaid));
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === aiMsgId ? { ...m, settlements: [...m.settlements, s] } : m
-        )
-      );
-      opts.onSettlement?.(s);
-    } else if (evt.type === "done") {
-      // no-op; finally{} will set streaming false
-    } else if (evt.type === "error") {
-      setError(evt.message);
-      opts.onError?.(evt.message);
-    }
-  };
-
   const reset = () => {
+    abortRef.current?.abort();
     setMessages([]);
     setError(null);
     setCurrentTokens(0);
     setSessionUsdcPaid(0);
     setSessionSettlements(0);
     setLatestSettlement(null);
+    sessionIdRef.current = null;
   };
 
   return {
     messages,
     streaming,
+    reconnecting,
     currentTokens,
     sessionUsdcPaid,
     sessionSettlements,
