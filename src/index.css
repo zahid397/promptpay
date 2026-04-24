@@ -2,104 +2,152 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
+/* PromptPay design system. All colors HSL. */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 215 80% 2%;
+    --foreground: 205 80% 95%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --surface: 215 50% 6%;
+    --surface-2: 213 45% 9%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --card: 215 50% 6%;
+    --card-foreground: 205 80% 95%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --popover: 215 50% 6%;
+    --popover-foreground: 205 80% 95%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --primary: 190 100% 50%;             /* cyan */
+    --primary-foreground: 215 80% 4%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --success: 152 100% 50%;             /* green */
+    --success-foreground: 215 80% 4%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --warning: 16 100% 60%;              /* orange */
+    --warning-foreground: 215 80% 4%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --danger: 0 100% 64%;                /* red */
+    --danger-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --secondary: 213 45% 12%;
+    --secondary-foreground: 205 80% 95%;
+
+    --muted: 213 45% 12%;
+    --muted-foreground: 207 35% 43%;
+
+    --accent: 190 100% 50%;
+    --accent-foreground: 215 80% 4%;
+
+    --destructive: 0 100% 64%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 213 47% 19%;
+    --input: 213 47% 19%;
+    --ring: 190 100% 50%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+    --font-display: 'Syne', system-ui, sans-serif;
+    --font-mono: 'Space Mono', ui-monospace, monospace;
+    --font-body: 'Inter', system-ui, sans-serif;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --grid-color: 190 100% 50%;
+    --shadow-glow-cyan: 0 0 24px hsl(190 100% 50% / 0.35);
+    --shadow-glow-green: 0 0 24px hsl(152 100% 50% / 0.35);
 
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 215 50% 6%;
+    --sidebar-foreground: 205 80% 95%;
+    --sidebar-primary: 190 100% 50%;
+    --sidebar-primary-foreground: 215 80% 4%;
+    --sidebar-accent: 213 45% 12%;
+    --sidebar-accent-foreground: 205 80% 95%;
+    --sidebar-border: 213 47% 19%;
+    --sidebar-ring: 190 100% 50%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* same — single dark theme */
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
+
+  html, body, #root { height: 100%; }
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    background-image:
+      linear-gradient(hsl(var(--grid-color) / 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--grid-color) / 0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
   }
+
+  .font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
+  .font-mono { font-family: var(--font-mono); }
 }
+
+@layer utilities {
+  .text-cyan   { color: hsl(var(--primary)); }
+  .text-green  { color: hsl(var(--success)); }
+  .text-orange { color: hsl(var(--warning)); }
+  .text-red    { color: hsl(var(--danger)); }
+  .text-muted  { color: hsl(var(--muted-foreground)); }
+
+  .bg-surface  { background-color: hsl(var(--surface)); }
+  .bg-surface-2{ background-color: hsl(var(--surface-2)); }
+
+  .border-cyan { border-color: hsl(var(--primary) / 0.4); }
+  .border-green{ border-color: hsl(var(--success) / 0.4); }
+  .border-orange{ border-color: hsl(var(--warning) / 0.5); }
+  .border-soft { border-color: hsl(var(--border)); }
+
+  .glow-cyan  { box-shadow: var(--shadow-glow-cyan); }
+  .glow-green { box-shadow: var(--shadow-glow-green); }
+
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.5); }
+}
+
+/* Animations */
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(1.2); }
+}
+@keyframes flash-bg {
+  0%   { background-color: hsl(var(--success) / 0.2); }
+  100% { background-color: transparent; }
+}
+
+.animate-slide-down { animation: slide-down 0.3s ease both; }
+.cursor-blink::after {
+  content: '|';
+  margin-left: 2px;
+  color: hsl(var(--primary));
+  animation: blink 1s steps(1) infinite;
+}
+.sweep-line {
+  position: absolute; top: 0; left: 0; height: 2px; width: 100%;
+  background: linear-gradient(90deg, transparent, hsl(var(--primary)), transparent);
+  animation: sweep 1.2s ease;
+}
+.pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+.flash-on-update { animation: flash-bg 0.8s ease; }
