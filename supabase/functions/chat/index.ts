@@ -37,10 +37,11 @@ Deno.serve(async (req) => {
     .from("users")
     .select("*")
     .eq("api_key", apiKey)
-    .single();
+    .is("revoked_at", null)
+    .maybeSingle();
 
   if (userError || !user) {
-    return new Response(JSON.stringify({ error: "Invalid API key" }), {
+    return new Response(JSON.stringify({ error: "Invalid or revoked API key" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -57,7 +58,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { messages, model = "gemini-2.0-flash" } = body;
+  const { messages, model = "gemini-2.0-flash", sessionId: resumeSessionId, resume } = body;
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return new Response(
       JSON.stringify({ error: "messages array required" }),
@@ -68,23 +69,36 @@ Deno.serve(async (req) => {
     );
   }
 
-  // 3. Create session
+  // 3. Create or resume session
   const promptPreview =
     messages[messages.length - 1]?.content?.slice(0, 100) || "";
-  const { data: session, error: sessionError } = await supabase
-    .from("sessions")
-    .insert({ user_id: user.id, model, prompt_preview: promptPreview })
-    .select()
-    .single();
 
-  if (sessionError || !session) {
-    return new Response(
-      JSON.stringify({ error: "Failed to create session" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+  let session: any = null;
+  if (resume && resumeSessionId) {
+    const { data: existing } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("id", resumeSessionId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (existing) session = existing;
+  }
+  if (!session) {
+    const { data: created, error: sessionError } = await supabase
+      .from("sessions")
+      .insert({ user_id: user.id, model, prompt_preview: promptPreview })
+      .select()
+      .single();
+    if (sessionError || !created) {
+      return new Response(
+        JSON.stringify({ error: "Failed to create session" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    session = created;
   }
 
   // 4. SSE stream
