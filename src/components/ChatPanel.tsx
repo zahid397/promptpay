@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CHAT_URL } from "@/lib/api";
-import { createWallet } from "@/lib/api";
+import { CHAT_URL, createWallet, verifyKey, endSession } from "@/lib/api";
 import { useChat, type SettlementEvent } from "@/hooks/useChat";
 
 interface Props {
@@ -16,6 +15,8 @@ export function ChatPanel({ onSessionStats }: Props) {
   const [gatewayUrl, setGatewayUrl] = useState(CHAT_URL);
   const [input, setInput] = useState("Explain pay-per-token billing in 4 sentences.");
   const [creating, setCreating] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -63,13 +64,66 @@ export function ChatPanel({ onSessionStats }: Props) {
     try {
       const res = await createWallet();
       setApiKey(res.apiKey);
-      toast.success("Account created", {
-        description: `${res.balance} loaded. Key saved locally.`,
+      toast.success("Account created · 10 USDC funded", {
+        description: "Key saved locally.",
+        action: {
+          label: "Copy key",
+          onClick: () => {
+            navigator.clipboard.writeText(res.apiKey);
+            toast.success("API key copied");
+          },
+        },
+        duration: 8000,
       });
     } catch (e: any) {
       toast.error("Failed to create account", { description: e?.message });
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleTestKey = async () => {
+    if (!apiKey.trim()) {
+      toast.error("Enter an API key first");
+      return;
+    }
+    setTesting(true);
+    try {
+      const res = await verifyKey(apiKey.trim());
+      if (res.valid) {
+        toast.success("API key valid", {
+          description: `Balance $${(res.balance ?? 0).toFixed(6)} · Spent $${(res.spent ?? 0).toFixed(6)}`,
+        });
+      } else {
+        toast.error("Invalid API key", { description: res.error || "Not found" });
+      }
+    } catch (e: any) {
+      toast.error("Verify failed", { description: e?.message });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleCopyKey = async () => {
+    if (!apiKey.trim()) return;
+    await navigator.clipboard.writeText(apiKey.trim());
+    toast.success("API key copied");
+  };
+
+  const handleReset = async () => {
+    setResetting(true);
+    try {
+      if (apiKey.trim()) {
+        const r = await endSession(apiKey.trim());
+        if (r.closed > 0) {
+          toast.success(`Closed ${r.closed} active session${r.closed > 1 ? "s" : ""}`);
+        }
+      }
+    } catch (e: any) {
+      toast.error("Could not close session", { description: e?.message });
+    } finally {
+      chat.reset();
+      setResetting(false);
     }
   };
 
@@ -102,8 +156,24 @@ export function ChatPanel({ onSessionStats }: Props) {
           />
         </div>
         <div>
-          <label className="font-mono text-[10px] uppercase tracking-wider text-muted">
-            API Key
+          <label className="font-mono text-[10px] uppercase tracking-wider text-muted flex items-center justify-between">
+            <span>API Key</span>
+            <span className="flex gap-2">
+              <button
+                onClick={handleTestKey}
+                disabled={testing || !apiKey.trim()}
+                className="text-cyan hover:underline disabled:opacity-30"
+              >
+                {testing ? "…" : "Test"}
+              </button>
+              <button
+                onClick={handleCopyKey}
+                disabled={!apiKey.trim()}
+                className="text-muted hover:text-foreground disabled:opacity-30"
+              >
+                Copy
+              </button>
+            </span>
           </label>
           <input
             value={apiKey}
@@ -190,11 +260,11 @@ export function ChatPanel({ onSessionStats }: Props) {
             <span className="text-green">${chat.sessionUsdcPaid.toFixed(6)}</span>
           </div>
           <button
-            onClick={chat.reset}
-            disabled={chat.streaming || chat.messages.length === 0}
+            onClick={handleReset}
+            disabled={chat.streaming || resetting || chat.messages.length === 0}
             className="font-mono text-[10px] uppercase tracking-wider text-muted hover:text-foreground disabled:opacity-30"
           >
-            Reset
+            {resetting ? "Closing…" : "Reset"}
           </button>
         </div>
         <div className="flex gap-2 items-end">

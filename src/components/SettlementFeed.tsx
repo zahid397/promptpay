@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import type { TxRow } from "@/hooks/useRealtimeTx";
 import { fmtTime, truncMid } from "@/lib/format";
 
@@ -6,19 +7,47 @@ interface Props {
 }
 
 export function SettlementFeed({ transactions }: Props) {
+  const handleCopyTx = async (id: string) => {
+    try {
+      await navigator.clipboard.writeText(id);
+      toast.success("TX hash copied", { description: id });
+    } catch {
+      toast.error("Copy failed");
+    }
+  };
+
+  const handleCopyAll = async () => {
+    if (transactions.length === 0) return;
+    const text = transactions
+      .map(
+        (t) =>
+          `${t.created_at}\t#${t.settlement_number}\t${Number(t.usdc_amount).toFixed(6)} USDC\t${t.tokens} tok\t${t.circle_transfer_id ?? ""}`
+      )
+      .join("\n");
+    await navigator.clipboard.writeText(text);
+    toast.success(`Copied ${transactions.length} transactions`);
+  };
+
   return (
     <div className="bg-surface border border-soft rounded-md overflow-hidden flex flex-col h-[520px]">
-      <div className="px-4 py-3 border-b border-soft flex items-center justify-between">
-        <div>
+      <div className="px-4 py-3 border-b border-soft flex items-center justify-between gap-2">
+        <div className="min-w-0">
           <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-cyan font-bold">
             Live Settlement Feed
           </div>
-          <div className="font-display font-extrabold text-lg mt-0.5">
+          <div className="font-display font-extrabold text-lg mt-0.5 truncate">
             On-chain micropayments
           </div>
         </div>
-        <div className="font-mono text-[10px] text-muted">
-          {transactions.length} shown
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="font-mono text-[10px] text-muted">{transactions.length} shown</span>
+          <button
+            onClick={handleCopyAll}
+            disabled={transactions.length === 0}
+            className="font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded-sm border border-soft text-muted hover:text-cyan hover:border-cyan transition disabled:opacity-30"
+          >
+            Copy all
+          </button>
         </div>
       </div>
 
@@ -59,9 +88,14 @@ export function SettlementFeed({ transactions }: Props) {
                 {tx.tokens} tokens · Settlement #{tx.settlement_number} · {fmtTime(tx.created_at)}
               </div>
               {tx.circle_transfer_id && (
-                <div className="font-mono text-[10px] text-muted mt-1 truncate">
-                  TX: <span className="text-cyan">{truncMid(tx.circle_transfer_id, 14, 6)}</span>
-                </div>
+                <button
+                  onClick={() => handleCopyTx(tx.circle_transfer_id!)}
+                  className="font-mono text-[10px] text-muted mt-1 truncate hover:text-cyan w-full text-left"
+                  title="Click to copy full TX hash"
+                >
+                  TX: <span className="text-cyan">{truncMid(tx.circle_transfer_id, 14, 6)}</span>{" "}
+                  <span className="text-muted">· copy</span>
+                </button>
               )}
             </div>
           );

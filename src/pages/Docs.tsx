@@ -1,11 +1,6 @@
 import { Link } from "react-router-dom";
 import { CHAT_URL, CREATE_WALLET_URL } from "@/lib/api";
-
-const Code = ({ children }: { children: React.ReactNode }) => (
-  <pre className="bg-surface-2 border border-soft rounded-sm p-4 font-mono text-[12px] overflow-x-auto text-foreground whitespace-pre-wrap break-words">
-    {children}
-  </pre>
-);
+import { CodeBlock } from "@/components/CodeBlock";
 
 const H = ({ children }: { children: React.ReactNode }) => (
   <h2 className="font-display font-extrabold text-xl mt-10 mb-3 text-cyan">{children}</h2>
@@ -34,24 +29,33 @@ const Docs = () => {
           <li>Create an account → receive an API key + 10 USDC testnet balance.</li>
           <li>POST to <code className="text-cyan">/chat</code> with your messages.</li>
           <li>Tokens stream back via Server-Sent Events.</li>
-          <li>Every 50 tokens we record a USDC settlement row in the database. The dashboard updates live via Supabase Realtime.</li>
+          <li>Every 50 tokens we record a USDC settlement row in the database. The dashboard updates live.</li>
           <li>Final <code>done</code> event includes a full economic proof comparing Arc vs. Ethereum L1.</li>
         </ol>
 
         <H>2 · Endpoints</H>
-        <Code>{`# Create account
+        <CodeBlock language="http">{`# Create account
 POST ${CREATE_WALLET_URL}
+
+# Verify API key
+POST ${CREATE_WALLET_URL.replace("create-wallet", "verify-key")}
+Headers:  X-API-Key: pp_your_key
+
+# End active session
+POST ${CREATE_WALLET_URL.replace("create-wallet", "end-session")}
+Headers:  X-API-Key: pp_your_key
+
+# Live stats snapshot
+GET  ${CREATE_WALLET_URL.replace("create-wallet", "stats-snapshot")}
 
 # Chat (SSE stream)
 POST ${CHAT_URL}
-Headers:
-  X-API-Key: pp_your_key
-Body:
-  { "messages": [{ "role": "user", "content": "Hello" }] }`}</Code>
+Headers:  X-API-Key: pp_your_key
+Body:     { "messages": [{ "role": "user", "content": "Hello" }] }`}</CodeBlock>
 
         <H>3 · SSE event types</H>
-        <p className="font-mono text-[12px] text-muted mb-2">Each line is <code>data: &#123;...&#125;\n\n</code>.</p>
-        <Code>{`// type: "token"
+        <p className="font-mono text-[12px] text-muted mb-2">Each frame is <code>data: &#123;...&#125;\n\n</code>.</p>
+        <CodeBlock language="json">{`// type: "token"
 { "type":"token", "text":"Hello", "chunkTokens":2, "totalTokens":2 }
 
 // type: "settlement"  (every 50 tokens)
@@ -73,7 +77,7 @@ Body:
                      "verdict":"IMPOSSIBLE on Ethereum L1: ..." } }
 
 // type: "error"
-{ "type":"error", "message":"..." }`}</Code>
+{ "type":"error", "message":"..." }`}</CodeBlock>
 
         <H>4 · Pricing</H>
         <div className="overflow-x-auto">
@@ -92,7 +96,7 @@ Body:
         </div>
 
         <H>5 · Economic proof</H>
-        <Code>{`At 50-token settlements:
+        <CodeBlock language="text">{`At 50-token settlements:
 
   Revenue / settlement   $0.005000 USDC
   Gas on Arc             ~$0.000000001  (negligible)
@@ -101,10 +105,10 @@ Body:
   Margin on Arc          ~99.98%
   Margin on Ethereum L1  −39,900%
 
-This is why pay-per-token billing only works on Arc.`}</Code>
+This is why pay-per-token billing only works on Arc.`}</CodeBlock>
 
         <H>6 · Quick example</H>
-        <Code>{`const res = await fetch("${CHAT_URL}", {
+        <CodeBlock language="js">{`const res = await fetch("${CHAT_URL}", {
   method: "POST",
   headers: { "Content-Type": "application/json", "X-API-Key": "pp_..." },
   body: JSON.stringify({ messages: [{ role: "user", content: "Hi" }] }),
@@ -122,12 +126,23 @@ while (true) {
     const evt = JSON.parse(part.slice(6));
     console.log(evt.type, evt);
   }
-}`}</Code>
+}`}</CodeBlock>
 
-        <div className="mt-10 mb-12">
-          <Link to="/" className="font-mono text-[12px] uppercase tracking-wider text-cyan">
+        <div className="mt-10 mb-12 flex items-center justify-between">
+          <Link
+            to="/"
+            className="font-mono text-[12px] uppercase tracking-wider text-cyan hover:underline"
+          >
             ← Back to dashboard
           </Link>
+          <a
+            href="https://github.com/public-apis/public-apis"
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-[12px] uppercase tracking-wider text-muted hover:text-cyan"
+          >
+            More APIs ↗
+          </a>
         </div>
       </main>
     </div>
