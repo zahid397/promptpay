@@ -101,12 +101,12 @@ Deno.serve(async (req) => {
     session = created;
   }
 
-  // 4. SSE stream
+  // 4. SSE stream — when resuming, continue counters from the existing session
   const encoder = new TextEncoder();
-  let totalTokens = 0;
+  let totalTokens = resume && session ? Number(session.total_tokens || 0) : 0;
   let pendingTokens = 0;
-  let totalUsdcPaid = 0;
-  let settlementCount = 0;
+  let totalUsdcPaid = resume && session ? Number(session.total_usdc_paid || 0) : 0;
+  let settlementCount = resume && session ? Number(session.settlement_count || 0) : 0;
   let runningBalance = parseFloat(user.balance_usdc);
   let runningSpent = parseFloat(user.total_spent_usdc || 0);
 
