@@ -14,10 +14,150 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      sessions: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          model: string
+          prompt_preview: string | null
+          settlement_count: number | null
+          status: string | null
+          total_tokens: number | null
+          total_usdc_paid: number | null
+          user_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          model?: string
+          prompt_preview?: string | null
+          settlement_count?: number | null
+          status?: string | null
+          total_tokens?: number | null
+          total_usdc_paid?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          model?: string
+          prompt_preview?: string | null
+          settlement_count?: number | null
+          status?: string | null
+          total_tokens?: number | null
+          total_usdc_paid?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          circle_transfer_id: string | null
+          created_at: string | null
+          gas_cost_arc: number | null
+          gas_cost_eth_l1: number | null
+          id: string
+          session_id: string | null
+          settlement_number: number
+          status: string | null
+          tokens: number
+          usdc_amount: number
+          user_id: string | null
+        }
+        Insert: {
+          circle_transfer_id?: string | null
+          created_at?: string | null
+          gas_cost_arc?: number | null
+          gas_cost_eth_l1?: number | null
+          id?: string
+          session_id?: string | null
+          settlement_number: number
+          status?: string | null
+          tokens: number
+          usdc_amount: number
+          user_id?: string | null
+        }
+        Update: {
+          circle_transfer_id?: string | null
+          created_at?: string | null
+          gas_cost_arc?: number | null
+          gas_cost_eth_l1?: number | null
+          id?: string
+          session_id?: string | null
+          settlement_number?: number
+          status?: string | null
+          tokens?: number
+          usdc_amount?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          api_key: string
+          balance_usdc: number | null
+          circle_wallet_id: string
+          created_at: string | null
+          id: string
+          total_spent_usdc: number | null
+        }
+        Insert: {
+          api_key: string
+          balance_usdc?: number | null
+          circle_wallet_id: string
+          created_at?: string | null
+          id?: string
+          total_spent_usdc?: number | null
+        }
+        Update: {
+          api_key?: string
+          balance_usdc?: number | null
+          circle_wallet_id?: string
+          created_at?: string | null
+          id?: string
+          total_spent_usdc?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      global_stats: {
+        Row: {
+          highest_settlement_number: number | null
+          total_sessions: number | null
+          total_tokens_processed: number | null
+          total_transactions: number | null
+          total_usdc_settled: number | null
+          total_users: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
