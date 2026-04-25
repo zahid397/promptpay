@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { messages, model = "gemini-2.0-flash", sessionId: resumeSessionId, resume } = body;
+  const { messages, model = "google/gemini-2.5-flash", sessionId: resumeSessionId, resume } = body;
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return new Response(
       JSON.stringify({ error: "messages array required" }),
@@ -110,9 +110,10 @@ Deno.serve(async (req) => {
   let runningBalance = parseFloat(user.balance_usdc);
   let runningSpent = parseFloat(user.total_spent_usdc || 0);
 
-  // Map model -> Lovable AI Gateway model id
-  const gatewayModel =
-    model === "gemini-2.0-flash" || model === "gemini-2.5-flash"
+  // Map model -> Lovable AI Gateway model id (accept already-prefixed ids too)
+  const gatewayModel = model.includes("/")
+    ? model
+    : model === "gemini-2.0-flash" || model === "gemini-2.5-flash"
       ? "google/gemini-2.5-flash"
       : `google/${model}`;
 
