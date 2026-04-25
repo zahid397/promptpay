@@ -78,8 +78,10 @@ export function RandomApiPanel({ compact = false }: Props) {
   }, []);
 
   const commitKey = (k: string) => {
-    setApiKey(k);
-    if (k.trim()) localStorage.setItem(LS_KEY, k.trim());
+    const next = k.trim();
+    setApiKey(next);
+    if (next.startsWith("pp_")) localStorage.setItem(LS_KEY, next);
+    else localStorage.removeItem(LS_KEY);
   };
 
   const provisionKey = async () => {
