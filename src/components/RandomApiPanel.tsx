@@ -380,36 +380,60 @@ export function RandomApiPanel({ compact = false }: Props) {
         ) : (
           <div className="max-h-[340px] overflow-y-auto">
             <AnimatePresence initial={false}>
-              {results.map((r) => (
-                <motion.div
-                  key={`${r.idx}-${r.txHash ?? r.error}`}
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="grid grid-cols-[36px_70px_1fr_auto] items-center gap-3 border-b border-soft px-4 py-2 last:border-0"
-                >
-                  {r.ok ? (
-                    <CheckCircle2 className="h-4 w-4 text-green" />
-                  ) : (
-                    <XCircle className="h-4 w-4 text-red" />
-                  )}
-                  <span className="font-mono text-[11px] text-muted">#{r.idx}</span>
-                  {r.ok ? (
+              {results.map((r) => {
+                const stageMeta: Record<PaidRandomStage, { label: string; cls: string; pulse?: boolean }> = {
+                  created:    { label: "Created",    cls: "bg-[hsl(220_15%_25%_/_0.6)] text-muted border-soft", pulse: true },
+                  confirming: { label: "Confirming", cls: "bg-[hsl(38_100%_50%_/_0.15)] text-orange border-orange/40", pulse: true },
+                  confirmed:  { label: "Confirmed",  cls: "bg-[hsl(195_100%_50%_/_0.15)] text-cyan border-cyan/40", pulse: true },
+                  settled:    { label: "Settled",    cls: "bg-[hsl(142_70%_45%_/_0.15)] text-green border-green/40" },
+                  error:      { label: "Error",      cls: "bg-[hsl(0_85%_60%_/_0.15)] text-red border-red/40" },
+                };
+                const m = stageMeta[r.stage];
+                const inFlight = r.stage !== "settled" && r.stage !== "error";
+                return (
+                  <motion.div
+                    key={r.idx}
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="grid grid-cols-[24px_44px_92px_1fr_auto] items-center gap-3 border-b border-soft px-4 py-2 last:border-0"
+                  >
+                    {r.stage === "settled" ? (
+                      <CheckCircle2 className="h-4 w-4 text-green" />
+                    ) : r.stage === "error" ? (
+                      <XCircle className="h-4 w-4 text-red" />
+                    ) : (
+                      <Loader2 className="h-4 w-4 animate-spin text-purple" />
+                    )}
+                    <span className="font-mono text-[11px] text-muted">#{r.idx}</span>
+                    <span
+                      className={`inline-flex items-center justify-center rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider ${m.cls} ${m.pulse ? "animate-pulse" : ""}`}
+                    >
+                      {m.label}
+                    </span>
                     <div className="min-w-0">
-                      <div className="font-mono text-[12px] tabular-nums text-foreground">
-                        {r.random?.toLocaleString()}
-                      </div>
-                      <div className="truncate font-mono text-[10px] text-muted">
-                        tx {r.txHash}
-                      </div>
+                      {r.stage === "settled" ? (
+                        <>
+                          <div className="font-mono text-[12px] tabular-nums text-foreground">
+                            {r.random?.toLocaleString()}
+                          </div>
+                          <div className="truncate font-mono text-[10px] text-muted">
+                            tx {r.txHash}
+                          </div>
+                        </>
+                      ) : r.stage === "error" ? (
+                        <span className="truncate font-mono text-[11px] text-red">{r.error}</span>
+                      ) : (
+                        <div className="truncate font-mono text-[10px] text-muted">
+                          {r.paymentId ? `pay ${r.paymentId.slice(0, 22)}…` : "issuing challenge…"}
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <span className="truncate font-mono text-[11px] text-red">{r.error}</span>
-                  )}
-                  <div className="text-right font-mono text-[10px] text-muted">
-                    {r.ok ? `$${r.amount?.toFixed(4)}` : "—"} · {r.ms}ms
-                  </div>
-                </motion.div>
-              ))}
+                    <div className="text-right font-mono text-[10px] text-muted">
+                      {r.amount ? `$${r.amount.toFixed(4)}` : "—"} · {inFlight ? "…" : `${r.ms}ms`}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
           </div>
         )}
