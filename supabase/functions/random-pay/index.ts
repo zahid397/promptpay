@@ -17,20 +17,6 @@ const corsHeaders = {
 const ARC_MODE = Deno.env.get("ARC_MODE") || "mock";
 const PRICE = 0.001;
 
-interface Challenge {
-  paymentId: string;
-  amount: number;
-  recipient: string;
-  createdAt: number;
-  expiresAt: number;
-  consumed: boolean;
-}
-
-// Shared isolate-level store with /random-challenge
-const store: Map<string, Challenge> =
-  (globalThis as any).__pp_challenges ||
-  ((globalThis as any).__pp_challenges = new Map<string, Challenge>());
-
 function bad(status: number, error: string, extra: Record<string, unknown> = {}) {
   return new Response(JSON.stringify({ ok: false, error, ...extra }), {
     status,
@@ -76,18 +62,23 @@ Deno.serve(async (req) => {
   const paymentId = (body.paymentId || "").trim();
   if (!paymentId) return bad(400, "paymentId required");
 
-  const challenge = store.get(paymentId);
-  if (!challenge) return bad(404, "Unknown or expired paymentId");
-  if (challenge.consumed) return bad(409, "Challenge already consumed");
-  if (challenge.expiresAt < Date.now()) {
-    store.delete(paymentId);
-    return bad(410, "Challenge expired");
-  }
-
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
+
+  const { data: challenge, error: chErr } = await supabase
+    .from("random_challenges")
+    .select("payment_id, amount, recipient, expires_at, consumed_at")
+    .eq("payment_id", paymentId)
+    .maybeSingle();
+
+  if (chErr || !challenge) return bad(404, "Unknown or expired paymentId");
+  if (challenge.consumed_at) return bad(409, "Challenge already consumed");
+  if (new Date(challenge.expires_at).getTime() < Date.now()) {
+    await supabase.from("random_challenges").delete().eq("payment_id", paymentId);
+    return bad(410, "Challenge expired");
+  }
 
   // 1. Validate API key + balance
   const { data: user, error: userErr } = await supabase
@@ -106,7 +97,10 @@ Deno.serve(async (req) => {
   if (!arc.ok) return bad(402, "Arc payment not confirmed");
 
   // Mark consumed BEFORE side-effects to prevent replay
-  challenge.consumed = true;
+  await supabase
+    .from("random_challenges")
+    .update({ consumed_at: new Date().toISOString() })
+    .eq("payment_id", paymentId);
 
   // 3. Debit wallet
   const newBalance = +(balance - PRICE).toFixed(6);
