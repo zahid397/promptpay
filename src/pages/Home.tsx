@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Wallet, DollarSign, Bot, ShieldCheck, PlayCircle, Send, Eye } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCardLg, Panel } from "@/components/PageCard";
+import { HackathonChat } from "@/components/HackathonChat";
 import { useRealtimeTx } from "@/hooks/useRealtimeTx";
 import { useStats } from "@/hooks/useStats";
 import { fmtNum, fmtTime, truncMid } from "@/lib/format";
@@ -53,6 +54,11 @@ const Home = () => {
           </div>
         </div>
       </section>
+
+      {/* Live hackathon LLM chat */}
+      <div className="mb-6">
+        <HackathonChat />
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
