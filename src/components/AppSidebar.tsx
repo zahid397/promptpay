@@ -47,7 +47,15 @@ export function AppSidebar() {
                 const active = pathname === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild className="h-10" isActive={active}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={active}
+                      className={
+                        active
+                          ? "h-10 bg-gradient-purple text-white font-medium glow-purple hover:bg-gradient-purple hover:text-white"
+                          : "h-10 text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
+                      }
+                    >
                       <NavLink to={item.url} end>
                         <item.icon className="h-4 w-4 shrink-0" />
                         {!collapsed && <span className="font-mono text-[12px]">{item.title}</span>}
