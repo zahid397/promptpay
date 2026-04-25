@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.revoke-key]
 verify_jwt = false
+
+[functions.add-funds]
+verify_jwt = false
