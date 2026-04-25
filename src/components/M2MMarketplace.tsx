@@ -156,6 +156,68 @@ export function M2MMarketplace({ apiKey, onApiKeyChange }: Props) {
         </div>
       </div>
 
+      {/* API Key (masked) */}
+      <div className="rounded-lg border border-soft bg-surface p-4">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
+            <KeyRound className="h-3.5 w-3.5 text-purple" /> Buyer Wallet API Key
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={pasteKey}
+              disabled={running}
+              className="font-mono text-[10px] uppercase tracking-wider text-cyan hover:underline disabled:opacity-50"
+            >
+              Paste
+            </button>
+            <span className="text-muted">·</span>
+            <button
+              type="button"
+              onClick={provisionKey}
+              disabled={running || provisioning}
+              className="font-mono text-[10px] uppercase tracking-wider text-purple hover:underline disabled:opacity-50"
+            >
+              {provisioning ? "Generating…" : "Generate new"}
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <input
+              type={showKey ? "text" : "password"}
+              value={localKey}
+              onChange={(e) => commitKey(e.target.value)}
+              placeholder="pp_your_api_key"
+              autoComplete="off"
+              spellCheck={false}
+              disabled={running}
+              className="w-full rounded-md border border-soft bg-surface-2 px-3 py-2 pr-10 font-mono text-[12px] text-foreground placeholder:text-muted focus:border-purple focus:outline-none focus:ring-1 focus:ring-purple disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey((v) => !v)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted hover:text-foreground"
+              title={showKey ? "Hide" : "Reveal"}
+            >
+              {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          <span
+            className={`font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded-sm ${
+              localKey.trim()
+                ? "bg-[hsl(152_100%_50%_/_0.15)] text-green"
+                : "bg-[hsl(0_100%_64%_/_0.15)] text-red"
+            }`}
+          >
+            {localKey.trim() ? "Loaded" : "Missing"}
+          </span>
+        </div>
+        <p className="mt-2 font-mono text-[10px] text-muted">
+          Stored only in this browser (localStorage). Used to fund AutoBuyer's USDC nanopayments.
+        </p>
+      </div>
+
       {/* Service picker */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {SERVICES.map((s) => {
