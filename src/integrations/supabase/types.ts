@@ -41,6 +41,33 @@ export type Database = {
         }
         Relationships: []
       }
+      random_challenges: {
+        Row: {
+          amount: number
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          payment_id: string
+          recipient: string
+        }
+        Insert: {
+          amount: number
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          payment_id: string
+          recipient: string
+        }
+        Update: {
+          amount?: number
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          payment_id?: string
+          recipient?: string
+        }
+        Relationships: []
+      }
       sessions: {
         Row: {
           completed_at: string | null
