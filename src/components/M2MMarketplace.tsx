@@ -2,13 +2,16 @@
 // Each successful trade is settled on Arc as a real DB-backed USDC nanopayment
 // and shows up in the realtime transactions feed.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
   Bot,
   Cloud,
   DollarSign,
+  Eye,
+  EyeOff,
+  KeyRound,
   Languages,
   LineChart,
   Loader2,
@@ -20,11 +23,14 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { runM2MTrade, type M2MTrade } from "@/lib/api";
+import { runM2MTrade, createWallet, type M2MTrade } from "@/lib/api";
 
 interface Props {
   apiKey: string;
+  onApiKeyChange?: (k: string) => void;
 }
+
+const LS_KEY = "promptpay.apiKey";
 
 const SERVICES = [
   { key: "weather", name: "WeatherOracle", price: 0.0008, icon: Cloud, accent: "text-cyan" },
@@ -35,19 +41,73 @@ const SERVICES = [
 
 type ServiceKey = (typeof SERVICES)[number]["key"];
 
-export function M2MMarketplace({ apiKey }: Props) {
+export function M2MMarketplace({ apiKey, onApiKeyChange }: Props) {
   const [service, setService] = useState<ServiceKey>("weather");
   const [rounds, setRounds] = useState(3);
   const [running, setRunning] = useState(false);
   const [trades, setTrades] = useState<M2MTrade[]>([]);
   const [newBalance, setNewBalance] = useState<number | null>(null);
+  const [localKey, setLocalKey] = useState(apiKey || "");
+  const [showKey, setShowKey] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
 
   const selected = SERVICES.find((s) => s.key === service)!;
 
-  const start = async () => {
+  // Sync external key in
+  useEffect(() => {
+    if (apiKey && apiKey !== localKey) setLocalKey(apiKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey]);
+
+  // Hydrate from localStorage on mount if nothing provided
+  useEffect(() => {
     if (!apiKey) {
+      const saved = localStorage.getItem(LS_KEY);
+      if (saved) {
+        setLocalKey(saved);
+        onApiKeyChange?.(saved);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const commitKey = (k: string) => {
+    setLocalKey(k);
+    if (k.trim()) localStorage.setItem(LS_KEY, k.trim());
+    onApiKeyChange?.(k.trim());
+  };
+
+  const pasteKey = async () => {
+    try {
+      const text = (await navigator.clipboard.readText()).trim();
+      if (!text) return toast.error("Clipboard is empty");
+      commitKey(text);
+      toast.success("Key pasted");
+    } catch {
+      toast.error("Could not read clipboard");
+    }
+  };
+
+  const provisionKey = async () => {
+    setProvisioning(true);
+    try {
+      const r = await createWallet();
+      commitKey(r.apiKey);
+      toast.success("New wallet · 10 USDC funded", {
+        description: "Key generated and stored locally.",
+      });
+    } catch (e: any) {
+      toast.error("Provision failed", { description: e?.message });
+    } finally {
+      setProvisioning(false);
+    }
+  };
+
+  const start = async () => {
+    const key = localKey.trim();
+    if (!key) {
       toast.error("API key required", {
-        description: "Paste your wallet API key first to fund the buyer agent.",
+        description: "Paste your wallet API key or click Generate to fund a new one.",
       });
       return;
     }
@@ -55,7 +115,7 @@ export function M2MMarketplace({ apiKey }: Props) {
     setTrades([]);
     setNewBalance(null);
     try {
-      const res = await runM2MTrade({ apiKey, service, rounds });
+      const res = await runM2MTrade({ apiKey: key, service, rounds });
       setTrades(res.trades);
       setNewBalance(res.newBalance);
       const ok = res.trades.filter((t) => t.ok).length;
@@ -94,6 +154,68 @@ export function M2MMarketplace({ apiKey }: Props) {
             <ShoppingBag className="h-5 w-5" />
           </div>
         </div>
+      </div>
+
+      {/* API Key (masked) */}
+      <div className="rounded-lg border border-soft bg-surface p-4">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
+            <KeyRound className="h-3.5 w-3.5 text-purple" /> Buyer Wallet API Key
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={pasteKey}
+              disabled={running}
+              className="font-mono text-[10px] uppercase tracking-wider text-cyan hover:underline disabled:opacity-50"
+            >
+              Paste
+            </button>
+            <span className="text-muted">·</span>
+            <button
+              type="button"
+              onClick={provisionKey}
+              disabled={running || provisioning}
+              className="font-mono text-[10px] uppercase tracking-wider text-purple hover:underline disabled:opacity-50"
+            >
+              {provisioning ? "Generating…" : "Generate new"}
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <input
+              type={showKey ? "text" : "password"}
+              value={localKey}
+              onChange={(e) => commitKey(e.target.value)}
+              placeholder="pp_your_api_key"
+              autoComplete="off"
+              spellCheck={false}
+              disabled={running}
+              className="w-full rounded-md border border-soft bg-surface-2 px-3 py-2 pr-10 font-mono text-[12px] text-foreground placeholder:text-muted focus:border-purple focus:outline-none focus:ring-1 focus:ring-purple disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey((v) => !v)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted hover:text-foreground"
+              title={showKey ? "Hide" : "Reveal"}
+            >
+              {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          <span
+            className={`font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded-sm ${
+              localKey.trim()
+                ? "bg-[hsl(152_100%_50%_/_0.15)] text-green"
+                : "bg-[hsl(0_100%_64%_/_0.15)] text-red"
+            }`}
+          >
+            {localKey.trim() ? "Loaded" : "Missing"}
+          </span>
+        </div>
+        <p className="mt-2 font-mono text-[10px] text-muted">
+          Stored only in this browser (localStorage). Used to fund AutoBuyer's USDC nanopayments.
+        </p>
       </div>
 
       {/* Service picker */}
