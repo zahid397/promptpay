@@ -123,10 +123,21 @@ const Dashboard = () => {
             onSessionStats={handleSession}
             apiKey={activeKey}
             onApiKeyChange={setActiveKey}
+            onChatState={handleChatState}
+          />
+          <SessionTrace
+            tokensStreamed={chatState.tokens}
+            settlements={chatState.settlements}
           />
           <AgentDemo apiKey={activeKey} />
         </div>
         <div className="space-y-4">
+          <BackendStatusPanel
+            isStreaming={chatState.streaming}
+            reconnecting={chatState.reconnecting}
+            tokensThisRun={chatState.tokens}
+            lastSettlementAt={chatState.lastSettlementAt}
+          />
           <MyKeys onUseKey={setActiveKey} />
           <EthFailsPanel sessionTokens={session.tokens} />
           <EconomicProof />
