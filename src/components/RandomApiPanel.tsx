@@ -18,13 +18,15 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { callPaidRandom, createWallet, verifyKey, type RandomPayResponse } from "@/lib/api";
+import { callPaidRandom, createWallet, verifyKey, type PaidRandomStage, type RandomPayResponse } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 
 const LS_KEY = "promptpay.apiKey";
 
 interface Result {
   idx: number;
+  stage: PaidRandomStage;
+  paymentId?: string;
   ok: boolean;
   random?: number;
   txHash?: string;
