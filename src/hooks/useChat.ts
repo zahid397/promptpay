@@ -36,7 +36,12 @@ export function useChat(opts: UseChatOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const sessionIdRef = useRef<string | null>(null);
-  const lastCtxRef = useRef<{ apiKey: string; gatewayUrl?: string; history: ChatMessage[] } | null>(null);
+  const lastCtxRef = useRef<{
+    apiKey: string;
+    gatewayUrl?: string;
+    history: ChatMessage[];
+    model?: string;
+  } | null>(null);
 
   const handleEvent = (evt: any, aiMsgId: string) => {
     if (evt.type === "session") {
@@ -71,7 +76,7 @@ export function useChat(opts: UseChatOptions = {}) {
 
   const runStream = async (
     aiMsgId: string,
-    ctx: { apiKey: string; gatewayUrl?: string; history: ChatMessage[] },
+    ctx: { apiKey: string; gatewayUrl?: string; history: ChatMessage[]; model?: string },
     resume = false
   ): Promise<{ ok: boolean; userAborted: boolean }> => {
     const ac = new AbortController();
@@ -84,6 +89,7 @@ export function useChat(opts: UseChatOptions = {}) {
       signal: ac.signal,
       sessionId: sessionIdRef.current ?? undefined,
       resume,
+      model: ctx.model,
     });
 
     if (!res.ok || !res.body) {
@@ -107,12 +113,14 @@ export function useChat(opts: UseChatOptions = {}) {
           buffer = buffer.slice(idx + 2);
           idx = buffer.indexOf("\n\n");
 
-          const dataLine = event.split("\n").find((l) => l.startsWith("data: "));
+          const dataLine = event
+            .split("\n")
+            .find((line) => line.startsWith("data: "));
           if (!dataLine) continue;
           try {
             handleEvent(JSON.parse(dataLine.slice(6)), aiMsgId);
           } catch {
-            /* skip */
+            /* ignore malformed chunk */
           }
         }
       }
@@ -123,10 +131,10 @@ export function useChat(opts: UseChatOptions = {}) {
   };
 
   const send = useCallback(
-    async (userText: string, ctx: { apiKey: string; gatewayUrl?: string }) => {
+    async (userText: string, ctx: { apiKey: string; gatewayUrl?: string; model?: string }) => {
       if (!userText.trim() || streaming) return;
       if (!ctx.apiKey) {
-        setError("Add an API key first (or click Create Account)");
+        setError("Add an API key first");
         return;
       }
 
@@ -156,7 +164,7 @@ export function useChat(opts: UseChatOptions = {}) {
         { role: "user", content: userText },
       ];
 
-      lastCtxRef.current = { apiKey: ctx.apiKey, gatewayUrl: ctx.gatewayUrl, history };
+      lastCtxRef.current = { apiKey: ctx.apiKey, gatewayUrl: ctx.gatewayUrl, history, model: ctx.model };
       setMessages((prev) => [...prev, userMsg, aiMsg]);
       setStreaming(true);
 
@@ -166,7 +174,7 @@ export function useChat(opts: UseChatOptions = {}) {
         try {
           const result = await runStream(aiMsg.id, lastCtxRef.current!, resume);
           if (result.userAborted) break;
-          break; // completed
+          break;
         } catch (e: any) {
           attempt++;
           if (attempt > MAX_RECONNECTS) {
@@ -187,7 +195,7 @@ export function useChat(opts: UseChatOptions = {}) {
           toast.warning(`Reconnecting stream… (${attempt}/${MAX_RECONNECTS})`, {
             description: `Resuming session in ${Math.round(wait / 100) / 10}s`,
           });
-          await new Promise((r) => setTimeout(r, wait));
+          await new Promise((resolve) => setTimeout(resolve, wait));
           resume = !!sessionIdRef.current;
         }
       }
@@ -199,8 +207,7 @@ export function useChat(opts: UseChatOptions = {}) {
       );
       abortRef.current = null;
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [messages, streaming]
+    [messages, streaming, opts]
   );
 
   const reset = () => {
