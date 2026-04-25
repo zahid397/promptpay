@@ -18,7 +18,7 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { callPaidRandom, createWallet, type RandomPayResponse } from "@/lib/api";
+import { callPaidRandom, createWallet, verifyKey, type RandomPayResponse } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 
 const LS_KEY = "promptpay.apiKey";
@@ -78,8 +78,10 @@ export function RandomApiPanel({ compact = false }: Props) {
   }, []);
 
   const commitKey = (k: string) => {
-    setApiKey(k);
-    if (k.trim()) localStorage.setItem(LS_KEY, k.trim());
+    const next = k.trim();
+    setApiKey(next);
+    if (next.startsWith("pp_")) localStorage.setItem(LS_KEY, next);
+    else localStorage.removeItem(LS_KEY);
   };
 
   const provisionKey = async () => {
@@ -95,19 +97,49 @@ export function RandomApiPanel({ compact = false }: Props) {
     }
   };
 
-  const requireKey = (): string | null => {
-    const k = apiKey.trim();
-    if (!k) {
-      toast.error("API key required", {
-        description: "Paste a key or click Generate to fund a new wallet.",
-      });
-      return null;
+  const requireKey = async (): Promise<string | null> => {
+    const typed = apiKey.trim();
+
+    const { data: sess } = await supabase.auth.getSession();
+    const uid = sess.session?.user?.id;
+    if (uid) {
+      const { data } = await supabase
+        .from("users")
+        .select("api_key")
+        .eq("auth_user_id", uid)
+        .is("revoked_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data?.api_key) {
+        if (typed !== data.api_key) {
+          commitKey(data.api_key);
+          if (typed) {
+            toast.info("Using your active wallet key", {
+              description: "The value you entered was replaced with your signed-in wallet API key.",
+            });
+          }
+        }
+        return data.api_key;
+      }
     }
-    return k;
+
+    if (typed && typed.startsWith("pp_")) {
+      const checked = await verifyKey(typed).catch(() => ({ valid: false }));
+      if (checked.valid) return typed;
+    }
+
+    toast.error("API key required", {
+      description: typed
+        ? "Use your real pp_... wallet key or click Generate new."
+        : "Paste a key or click Generate to fund a new wallet.",
+    });
+    return null;
   };
 
   const callOnce = async () => {
-    const key = requireKey();
+    const key = await requireKey();
     if (!key) return;
     setRunning(true);
     const t0 = performance.now();
@@ -138,7 +170,7 @@ export function RandomApiPanel({ compact = false }: Props) {
   };
 
   const bulk50 = async () => {
-    const key = requireKey();
+    const key = await requireKey();
     if (!key) return;
     const total = 50;
     setBulkRunning(true);
