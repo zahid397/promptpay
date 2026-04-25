@@ -14,6 +14,8 @@ export const HEALTH_URL = `${FUNCTIONS_BASE}/health`;
 export const REVOKE_KEY_URL = `${FUNCTIONS_BASE}/revoke-key`;
 export const ADD_FUNDS_URL = `${FUNCTIONS_BASE}/add-funds`;
 export const M2M_TRADE_URL = `${FUNCTIONS_BASE}/m2m-trade`;
+export const RANDOM_CHALLENGE_URL = `${FUNCTIONS_BASE}/random-challenge`;
+export const RANDOM_PAY_URL = `${FUNCTIONS_BASE}/random-pay`;
 
 async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
@@ -238,4 +240,68 @@ export async function streamChat(opts: {
     }),
     signal: opts.signal,
   });
+}
+
+// ───── Paid Random Number API (Per-API Monetization track) ─────
+
+export interface RandomChallenge {
+  paymentId: string;
+  amount: number;
+  currency: string;
+  recipient: string;
+  network: string;
+  expiresAt: string;
+  mock: boolean;
+}
+
+export interface RandomPayResponse {
+  ok: boolean;
+  random: number;
+  txHash: string;
+  paymentId: string;
+  amountPaid: number;
+  newBalance: number;
+  settlementNumber: number;
+  mock: boolean;
+}
+
+export async function fetchRandomChallenge(): Promise<RandomChallenge> {
+  return jsonFetch<RandomChallenge>(
+    RANDOM_CHALLENGE_URL,
+    { method: "GET", headers: await authHeaders() },
+    { toastLabel: "Get challenge" }
+  );
+}
+
+/** Mock arc SDK — `arcSDK.createPayment` simulated finality (1s in real edge fn). */
+export async function arcCreatePayment(challenge: RandomChallenge): Promise<{ confirmed: boolean }> {
+  // In real mode this would call @arc-payments/sdk createPayment().
+  // Here we just resolve immediately — actual Arc verification happens in /random-pay.
+  return { confirmed: true };
+}
+
+export async function payAndGetRandom(opts: {
+  apiKey: string;
+  paymentId: string;
+}): Promise<RandomPayResponse> {
+  return jsonFetch<RandomPayResponse>(
+    RANDOM_PAY_URL,
+    {
+      method: "POST",
+      headers: {
+        ...(await authHeaders()),
+        "Content-Type": "application/json",
+        "X-API-Key": opts.apiKey,
+      },
+      body: JSON.stringify({ paymentId: opts.paymentId }),
+    },
+    { toastLabel: "Random pay" }
+  );
+}
+
+/** Convenience: full 3-step flow → challenge → mock arc create → /random-pay */
+export async function callPaidRandom(apiKey: string): Promise<RandomPayResponse> {
+  const challenge = await fetchRandomChallenge();
+  await arcCreatePayment(challenge);
+  return payAndGetRandom({ apiKey, paymentId: challenge.paymentId });
 }

@@ -26,3 +26,12 @@ verify_jwt = false
 
 [functions.demo-chat]
 verify_jwt = false
+
+[functions.m2m-trade]
+verify_jwt = false
+
+[functions.random-challenge]
+verify_jwt = false
+
+[functions.random-pay]
+verify_jwt = false

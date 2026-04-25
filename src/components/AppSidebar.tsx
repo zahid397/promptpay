@@ -1,4 +1,4 @@
-import { Home, Wallet, ArrowLeftRight, Bot, Key, BarChart3, Settings, Zap } from "lucide-react";
+import { Home, Wallet, ArrowLeftRight, Bot, Key, BarChart3, Settings, Zap, Dice5, TrendingUp } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -7,6 +7,8 @@ import {
 
 const items = [
   { title: "Home", url: "/", icon: Home },
+  { title: "Random API", url: "/random", icon: Dice5 },
+  { title: "Margin Proof", url: "/margin", icon: TrendingUp },
   { title: "Wallets", url: "/wallets", icon: Wallet },
   { title: "Transactions", url: "/transactions", icon: ArrowLeftRight },
   { title: "AI Agents", url: "/agents", icon: Bot },

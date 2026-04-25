@@ -5,6 +5,7 @@ import { Wallet, DollarSign, Bot, ShieldCheck, Send, Eye } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCardLg, Panel } from "@/components/PageCard";
 import { HackathonChat } from "@/components/HackathonChat";
+import { RandomApiPanel } from "@/components/RandomApiPanel";
 import { useRealtimeTx } from "@/hooks/useRealtimeTx";
 import { useStats } from "@/hooks/useStats";
 import { createWallet } from "@/lib/api";
@@ -90,6 +91,11 @@ const Home = () => {
       {/* Live hackathon LLM chat */}
       <div id="hackathon-chat" className="mb-6 scroll-mt-20">
         <HackathonChat />
+      </div>
+
+      {/* Paid Random API widget — Per-API Monetization track */}
+      <div id="random-widget" className="mb-6 scroll-mt-20">
+        <RandomApiPanel compact />
       </div>
 
       {/* Stats */}
