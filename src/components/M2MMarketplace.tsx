@@ -2,13 +2,16 @@
 // Each successful trade is settled on Arc as a real DB-backed USDC nanopayment
 // and shows up in the realtime transactions feed.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
   Bot,
   Cloud,
   DollarSign,
+  Eye,
+  EyeOff,
+  KeyRound,
   Languages,
   LineChart,
   Loader2,
@@ -20,11 +23,14 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { runM2MTrade, type M2MTrade } from "@/lib/api";
+import { runM2MTrade, createWallet, type M2MTrade } from "@/lib/api";
 
 interface Props {
   apiKey: string;
+  onApiKeyChange?: (k: string) => void;
 }
+
+const LS_KEY = "promptpay.apiKey";
 
 const SERVICES = [
   { key: "weather", name: "WeatherOracle", price: 0.0008, icon: Cloud, accent: "text-cyan" },
