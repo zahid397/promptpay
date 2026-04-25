@@ -114,9 +114,10 @@ export function ChatPanel({ onSessionStats, apiKey: extKey, onApiKeyChange, onCh
             navigator.clipboard.writeText(res.apiKey);
             toast.success("API key copied");
           },
-        },
-        duration: 8000,
-      });
+          },
+          duration: 8000,
+        }
+      );
     } catch (e: any) {
       toast.error("Failed to create account", { description: e?.message });
     } finally {
