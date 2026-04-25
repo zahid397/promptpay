@@ -13,6 +13,7 @@ export const STATS_URL = `${FUNCTIONS_BASE}/stats-snapshot`;
 export const HEALTH_URL = `${FUNCTIONS_BASE}/health`;
 export const REVOKE_KEY_URL = `${FUNCTIONS_BASE}/revoke-key`;
 export const ADD_FUNDS_URL = `${FUNCTIONS_BASE}/add-funds`;
+export const M2M_TRADE_URL = `${FUNCTIONS_BASE}/m2m-trade`;
 
 async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
@@ -163,6 +164,48 @@ export async function fetchHealth(): Promise<HealthResponse> {
     { retries: 1, baseDelayMs: 300 }
   );
   return res.json();
+}
+
+export interface M2MTrade {
+  ok: boolean;
+  round: number;
+  seller?: string;
+  price?: number;
+  buyerRequest?: string;
+  sellerResponse?: string;
+  tokens?: number;
+  arcTxHash?: string;
+  settlementNumber?: number;
+  timestamp?: string;
+  error?: string;
+}
+
+export interface M2MResponse {
+  success: boolean;
+  service: string;
+  rounds: number;
+  newBalance: number;
+  trades: M2MTrade[];
+}
+
+export async function runM2MTrade(opts: {
+  apiKey: string;
+  service: "weather" | "stock" | "translate" | "summarize";
+  rounds: number;
+}): Promise<M2MResponse> {
+  return jsonFetch<M2MResponse>(
+    M2M_TRADE_URL,
+    {
+      method: "POST",
+      headers: {
+        ...(await authHeaders()),
+        "Content-Type": "application/json",
+        "X-API-Key": opts.apiKey,
+      },
+      body: JSON.stringify({ service: opts.service, rounds: opts.rounds }),
+    },
+    { toastLabel: "M2M trade" }
+  );
 }
 
 export interface ChatMessage {
