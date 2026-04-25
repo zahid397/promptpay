@@ -12,6 +12,8 @@ import Settings from "./pages/Settings";
 import Docs from "./pages/Docs.tsx";
 import Auth from "./pages/Auth.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
+import Random from "./pages/Random";
+import Margin from "./pages/Margin";
 import NotFound from "./pages/NotFound.tsx";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
@@ -32,6 +34,8 @@ const App = () => (
           <Route path="/agents" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
           <Route path="/keys" element={<ProtectedRoute><Keys /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+          <Route path="/random" element={<ProtectedRoute><Random /></ProtectedRoute>} />
+          <Route path="/margin" element={<ProtectedRoute><Margin /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
