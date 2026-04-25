@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { AgentDemo } from "@/components/AgentDemo";
 import { LocalAgentSandbox } from "@/components/LocalAgentSandbox";
+import { M2MMarketplace } from "@/components/M2MMarketplace";
 import { StatCardLg, Panel } from "@/components/PageCard";
 import { ChatPanel } from "@/components/ChatPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -114,7 +115,7 @@ const initialAgents: Agent[] = [
 const Agents = () => {
   const [agents, setAgents] = useState(initialAgents);
   const [activeKey, setActiveKey] = useState("");
-  const [runnerMode, setRunnerMode] = useState<"live" | "local">("local");
+  const [runnerMode, setRunnerMode] = useState<"live" | "local" | "m2m">("local");
   const [selectedAgentId, setSelectedAgentId] = useState(initialAgents[0].id);
   const runnerRef = useRef<HTMLElement | null>(null);
   const { transactions } = useRealtimeTx(20);
@@ -256,13 +257,16 @@ const Agents = () => {
           </div>
         </div>
 
-        <Tabs value={runnerMode} onValueChange={(value) => setRunnerMode(value as "live" | "local")}>
-          <TabsList className="mb-4 grid w-full grid-cols-2 bg-surface-2">
+        <Tabs value={runnerMode} onValueChange={(value) => setRunnerMode(value as "live" | "local" | "m2m")}>
+          <TabsList className="mb-4 grid w-full grid-cols-3 bg-surface-2">
             <TabsTrigger value="local" className="font-mono text-[11px] uppercase tracking-wider data-[state=active]:bg-background data-[state=active]:text-purple">
               Local helper
             </TabsTrigger>
             <TabsTrigger value="live" className="font-mono text-[11px] uppercase tracking-wider data-[state=active]:bg-background data-[state=active]:text-purple">
               Live runner
+            </TabsTrigger>
+            <TabsTrigger value="m2m" className="font-mono text-[11px] uppercase tracking-wider data-[state=active]:bg-background data-[state=active]:text-purple">
+              M2M Market
             </TabsTrigger>
           </TabsList>
 
@@ -286,6 +290,10 @@ const Agents = () => {
             </div>
             <AgentDemo apiKey={activeKey} />
             <ChatPanel onSessionStats={() => {}} apiKey={activeKey} onApiKeyChange={setActiveKey} />
+          </TabsContent>
+
+          <TabsContent value="m2m">
+            <M2MMarketplace apiKey={activeKey} />
           </TabsContent>
         </Tabs>
       </Panel>
