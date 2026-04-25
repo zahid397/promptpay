@@ -293,7 +293,7 @@ const Agents = () => {
           </TabsContent>
 
           <TabsContent value="m2m">
-            <M2MMarketplace apiKey={activeKey} />
+            <M2MMarketplace apiKey={activeKey} onApiKeyChange={setActiveKey} />
           </TabsContent>
         </Tabs>
       </Panel>
