@@ -11,10 +11,13 @@ import { HealthDot } from "@/components/HealthDot";
 import { MyKeys } from "@/components/MyKeys";
 import { AgentDemo } from "@/components/AgentDemo";
 import { Leaderboard } from "@/components/Leaderboard";
+import { BackendStatusPanel } from "@/components/BackendStatusPanel";
+import { SessionTrace } from "@/components/SessionTrace";
 import { useRealtimeTx } from "@/hooks/useRealtimeTx";
 import { useStats } from "@/hooks/useStats";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import type { SettlementEvent } from "@/hooks/useChat";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -23,9 +26,21 @@ const Dashboard = () => {
   const stats = useStats(transactions);
   const [session, setSession] = useState({ settlements: 0, usdc: 0, tokens: 0 });
   const [activeKey, setActiveKey] = useState<string>("");
+  const [chatState, setChatState] = useState<{
+    streaming: boolean;
+    reconnecting: boolean;
+    tokens: number;
+    settlements: SettlementEvent[];
+    lastSettlementAt: string | null;
+  }>({ streaming: false, reconnecting: false, tokens: 0, settlements: [], lastSettlementAt: null });
 
   const handleSession = useCallback(
     (s: { settlements: number; usdc: number; tokens: number }) => setSession(s),
+    []
+  );
+
+  const handleChatState = useCallback(
+    (s: typeof chatState) => setChatState(s),
     []
   );
 
@@ -108,10 +123,21 @@ const Dashboard = () => {
             onSessionStats={handleSession}
             apiKey={activeKey}
             onApiKeyChange={setActiveKey}
+            onChatState={handleChatState}
+          />
+          <SessionTrace
+            tokensStreamed={chatState.tokens}
+            settlements={chatState.settlements}
           />
           <AgentDemo apiKey={activeKey} />
         </div>
         <div className="space-y-4">
+          <BackendStatusPanel
+            isStreaming={chatState.streaming}
+            reconnecting={chatState.reconnecting}
+            tokensThisRun={chatState.tokens}
+            lastSettlementAt={chatState.lastSettlementAt}
+          />
           <MyKeys onUseKey={setActiveKey} />
           <EthFailsPanel sessionTokens={session.tokens} />
           <EconomicProof />

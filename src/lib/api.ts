@@ -25,10 +25,18 @@ async function authHeaders(): Promise<Record<string, string>> {
 
 export interface CreateWalletResponse {
   success: boolean;
+  rotated?: boolean;
   apiKey: string;
   walletId: string;
+  arcAddress?: string;
   userId: string;
-  balance: string;
+  balance: number | string;
+  balanceFormatted?: string;
+  currency?: string;
+  network?: string;
+  provider?: string;
+  status?: string;
+  createdAt?: string;
   message: string;
 }
 

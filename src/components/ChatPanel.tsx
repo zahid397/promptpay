@@ -7,12 +7,19 @@ interface Props {
   onSessionStats: (s: { settlements: number; usdc: number; tokens: number }) => void;
   apiKey?: string;
   onApiKeyChange?: (k: string) => void;
+  onChatState?: (state: {
+    streaming: boolean;
+    reconnecting: boolean;
+    tokens: number;
+    settlements: SettlementEvent[];
+    lastSettlementAt: string | null;
+  }) => void;
 }
 
 const LS_KEY = "promptpay.apiKey";
 const LS_URL = "promptpay.gatewayUrl";
 
-export function ChatPanel({ onSessionStats, apiKey: extKey, onApiKeyChange }: Props) {
+export function ChatPanel({ onSessionStats, apiKey: extKey, onApiKeyChange, onChatState }: Props) {
   const [apiKey, setApiKeyState] = useState("");
   const setApiKey = (k: string) => {
     setApiKeyState(k);
@@ -66,6 +73,27 @@ export function ChatPanel({ onSessionStats, apiKey: extKey, onApiKeyChange }: Pr
   }, [chat.sessionSettlements, chat.sessionUsdcPaid, chat.currentTokens, onSessionStats]);
 
   useEffect(() => {
+    if (!onChatState) return;
+    // Aggregate all settlements across the current session (last assistant msg has them)
+    const lastAssistant = [...chat.messages].reverse().find((m) => m.role === "assistant");
+    const settlements = lastAssistant?.settlements ?? [];
+    onChatState({
+      streaming: chat.streaming,
+      reconnecting: chat.reconnecting,
+      tokens: chat.currentTokens,
+      settlements,
+      lastSettlementAt: chat.latestSettlement?.timestamp ?? null,
+    });
+  }, [
+    chat.streaming,
+    chat.reconnecting,
+    chat.currentTokens,
+    chat.latestSettlement,
+    chat.messages,
+    onChatState,
+  ]);
+
+  useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
@@ -76,17 +104,20 @@ export function ChatPanel({ onSessionStats, apiKey: extKey, onApiKeyChange }: Pr
     try {
       const res = await createWallet();
       setApiKey(res.apiKey);
-      toast.success("Account created · 10 USDC funded", {
-        description: "Key saved locally.",
+      toast.success(
+        res.rotated ? "API key rotated" : `Wallet provisioned · ${res.balanceFormatted ?? "10 USDC"} funded`,
+        {
+          description: `${res.walletId}${res.arcAddress ? ` · ${res.arcAddress.slice(0, 10)}…` : ""}`,
         action: {
           label: "Copy key",
           onClick: () => {
             navigator.clipboard.writeText(res.apiKey);
             toast.success("API key copied");
           },
-        },
-        duration: 8000,
-      });
+          },
+          duration: 8000,
+        }
+      );
     } catch (e: any) {
       toast.error("Failed to create account", { description: e?.message });
     } finally {
