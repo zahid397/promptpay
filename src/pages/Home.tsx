@@ -93,6 +93,11 @@ const Home = () => {
         <HackathonChat />
       </div>
 
+      {/* Paid Random API widget — Per-API Monetization track */}
+      <div id="random-widget" className="mb-6 scroll-mt-20">
+        <RandomApiPanel compact />
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
         <StatCardLg label="Total Transactions" value={fmtNum(stats.totalTx)} sub="↑ 23.5%" accent="purple"
