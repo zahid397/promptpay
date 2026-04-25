@@ -299,18 +299,42 @@ export async function payAndGetRandom(opts: {
   );
 }
 
+export type PaidRandomStage =
+  | "created"      // /api/challenge returned a paymentId
+  | "confirming"  // arcSDK.createPayment in flight (mock 1s)
+  | "confirmed"   // Arc finality reached, about to verify
+  | "settled"     // /api/random verified + tx persisted
+  | "error";
+
+export interface PaidRandomEvent {
+  stage: PaidRandomStage;
+  paymentId?: string;
+  amount?: number;
+  error?: string;
+}
+
 /** Convenience: full 3-step flow → challenge → mock arc create → /random-pay.
  *  Auto-retries once with a fresh challenge if the paymentId was already
- *  consumed (HTTP 409) — happens on rapid double-clicks / StrictMode replays. */
-export async function callPaidRandom(apiKey: string): Promise<RandomPayResponse> {
+ *  consumed (HTTP 409). Emits stage updates via `onStage` so the UI can show
+ *  the live lifecycle (created → confirming → confirmed → settled). */
+export async function callPaidRandom(
+  apiKey: string,
+  onStage?: (e: PaidRandomEvent) => void
+): Promise<RandomPayResponse> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const challenge = await fetchRandomChallenge();
+    onStage?.({ stage: "created", paymentId: challenge.paymentId, amount: challenge.amount });
+    onStage?.({ stage: "confirming", paymentId: challenge.paymentId, amount: challenge.amount });
     await arcCreatePayment(challenge);
+    onStage?.({ stage: "confirmed", paymentId: challenge.paymentId, amount: challenge.amount });
     try {
-      return await payAndGetRandom({ apiKey, paymentId: challenge.paymentId });
+      const r = await payAndGetRandom({ apiKey, paymentId: challenge.paymentId });
+      onStage?.({ stage: "settled", paymentId: challenge.paymentId, amount: r.amountPaid });
+      return r;
     } catch (e: any) {
       const msg = String(e?.message ?? "");
       if (attempt === 0 && /already consumed|409/i.test(msg)) continue;
+      onStage?.({ stage: "error", paymentId: challenge.paymentId, error: msg });
       throw e;
     }
   }
