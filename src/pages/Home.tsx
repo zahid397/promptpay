@@ -1,20 +1,51 @@
-import { Link } from "react-router-dom";
-import { Wallet, DollarSign, Bot, ShieldCheck, PlayCircle, Send, Eye } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Wallet, DollarSign, Bot, ShieldCheck, Send, Eye } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCardLg, Panel } from "@/components/PageCard";
 import { HackathonChat } from "@/components/HackathonChat";
 import { useRealtimeTx } from "@/hooks/useRealtimeTx";
 import { useStats } from "@/hooks/useStats";
-import { fmtNum, fmtTime, truncMid } from "@/lib/format";
+import { createWallet } from "@/lib/api";
+import { fmtNum, fmtTime } from "@/lib/format";
 import heroImg from "@/assets/hero-cube.png";
 
 const Home = () => {
+  const navigate = useNavigate();
   const { transactions } = useRealtimeTx(8);
   const stats = useStats(transactions);
+  const [creating, setCreating] = useState(false);
 
   const successRate = transactions.length
     ? (transactions.filter((t) => t.status === "complete").length / transactions.length) * 100
     : 99.8;
+
+  const handleCreateWallet = async () => {
+    setCreating(true);
+    try {
+      const res = await createWallet();
+      toast.success(
+        res.rotated ? "API key rotated" : `Wallet provisioned · ${res.balanceFormatted ?? "10 USDC"}`,
+        {
+          description: res.walletId,
+          action: {
+            label: "View",
+            onClick: () => navigate("/wallets"),
+          },
+          duration: 6000,
+        }
+      );
+    } catch (e: any) {
+      toast.error("Wallet provisioning failed", { description: e?.message });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleTryAgent = () => {
+    document.getElementById("hackathon-chat")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <DashboardLayout title="" subtitle="">
@@ -35,18 +66,19 @@ const Home = () => {
               PromptPay enables sub-cent payments for AI agents using USDC on Arc with Circle's Nanopayments.
             </p>
             <div className="flex flex-wrap gap-3 mt-6">
-              <Link
-                to="/agents"
+              <button
+                onClick={handleTryAgent}
                 className="inline-flex items-center gap-2 font-mono text-[12px] uppercase tracking-wider px-5 py-3 rounded-lg bg-gradient-purple text-white glow-purple hover:opacity-90 transition"
               >
                 <Bot className="h-4 w-4" /> Try AI Chat
-              </Link>
-              <Link
-                to="/wallets"
-                className="inline-flex items-center gap-2 font-mono text-[12px] uppercase tracking-wider px-5 py-3 rounded-lg border border-soft text-foreground hover:border-purple transition"
+              </button>
+              <button
+                onClick={handleCreateWallet}
+                disabled={creating}
+                className="inline-flex items-center gap-2 font-mono text-[12px] uppercase tracking-wider px-5 py-3 rounded-lg border border-soft text-foreground hover:border-purple transition disabled:opacity-50"
               >
-                <Wallet className="h-4 w-4" /> Create Wallet
-              </Link>
+                <Wallet className="h-4 w-4" /> {creating ? "Provisioning…" : "Create Wallet"}
+              </button>
             </div>
           </div>
           <div className="hidden md:flex items-center justify-center">
@@ -56,7 +88,7 @@ const Home = () => {
       </section>
 
       {/* Live hackathon LLM chat */}
-      <div className="mb-6">
+      <div id="hackathon-chat" className="mb-6 scroll-mt-20">
         <HackathonChat />
       </div>
 
