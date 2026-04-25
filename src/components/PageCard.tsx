@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { forwardRef, ReactNode } from "react";
 
 interface StatCardProps {
   label: string;
@@ -38,19 +38,19 @@ export function StatCardLg({ label, value, sub, icon, accent = "purple" }: StatC
   );
 }
 
-export function Panel({
-  title,
-  children,
-  action,
-  className = "",
-}: {
+interface PanelProps {
   title?: ReactNode;
   children: ReactNode;
   action?: ReactNode;
   className?: string;
-}) {
+}
+
+export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
+  { title, children, action, className = "" },
+  ref
+) {
   return (
-    <section className={`bg-surface border border-soft rounded-lg ${className}`}>
+    <section ref={ref} className={`bg-surface border border-soft rounded-lg ${className}`}>
       {title && (
         <header className="px-4 md:px-5 py-3 md:py-4 border-b border-soft flex items-center justify-between gap-3">
           <h2 className="font-display font-bold text-lg text-foreground">{title}</h2>
@@ -60,4 +60,4 @@ export function Panel({
       <div className="p-4 md:p-5">{children}</div>
     </section>
   );
-}
+});

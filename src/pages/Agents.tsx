@@ -26,7 +26,7 @@ const initialAgents: Agent[] = [
 const Agents = () => {
   const [agents, setAgents] = useState(initialAgents);
   const [activeKey, setActiveKey] = useState("");
-  const [showRunner, setShowRunner] = useState(false);
+  const [showRunner, setShowRunner] = useState(true);
   const { transactions } = useRealtimeTx(20);
 
   const toggle = (id: string) => {

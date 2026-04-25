@@ -35,16 +35,16 @@ const Home = () => {
             </p>
             <div className="flex flex-wrap gap-3 mt-6">
               <Link
-                to="/wallets"
+                to="/agents"
                 className="inline-flex items-center gap-2 font-mono text-[12px] uppercase tracking-wider px-5 py-3 rounded-lg bg-gradient-purple text-white glow-purple hover:opacity-90 transition"
               >
-                <Wallet className="h-4 w-4" /> Create Wallet
+                <Bot className="h-4 w-4" /> Try AI Chat
               </Link>
               <Link
-                to="/docs"
+                to="/wallets"
                 className="inline-flex items-center gap-2 font-mono text-[12px] uppercase tracking-wider px-5 py-3 rounded-lg border border-soft text-foreground hover:border-purple transition"
               >
-                <PlayCircle className="h-4 w-4" /> How it Works
+                <Wallet className="h-4 w-4" /> Create Wallet
               </Link>
             </div>
           </div>
