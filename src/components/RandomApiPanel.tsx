@@ -140,31 +140,51 @@ export function RandomApiPanel({ compact = false }: Props) {
     return null;
   };
 
+  const upsertRow = (idx: number, patch: Partial<Result>) => {
+    setResults((prev) => {
+      const i = prev.findIndex((r) => r.idx === idx);
+      if (i === -1) {
+        return [{ idx, stage: "created", ok: false, ms: 0, ...patch } as Result, ...prev].slice(0, 60);
+      }
+      const next = [...prev];
+      next[i] = { ...next[i], ...patch };
+      return next;
+    });
+  };
+
   const callOnce = async () => {
     const key = await requireKey();
     if (!key) return;
     setRunning(true);
+    const idx = (results[0]?.idx ?? 0) + 1;
     const t0 = performance.now();
+    upsertRow(idx, { stage: "created", ms: 0 });
     try {
-      const r = await callPaidRandom(key);
+      const r = await callPaidRandom(key, (e) =>
+        upsertRow(idx, {
+          stage: e.stage,
+          paymentId: e.paymentId,
+          amount: e.amount,
+          error: e.error,
+          ms: Math.round(performance.now() - t0),
+        })
+      );
       const ms = Math.round(performance.now() - t0);
       setLatest(r);
-      setResults((prev) => [
-        {
-          idx: (prev[0]?.idx ?? 0) + 1,
-          ok: true,
-          random: r.random,
-          txHash: r.txHash,
-          amount: r.amountPaid,
-          settlementNumber: r.settlementNumber,
-          ms,
-        },
-        ...prev,
-      ].slice(0, 60));
+      upsertRow(idx, {
+        stage: "settled",
+        ok: true,
+        random: r.random,
+        txHash: r.txHash,
+        amount: r.amountPaid,
+        settlementNumber: r.settlementNumber,
+        ms,
+      });
       toast.success("Paid random delivered", {
         description: `$${r.amountPaid.toFixed(4)} settled on Arc · #${r.settlementNumber}`,
       });
     } catch (e: any) {
+      upsertRow(idx, { stage: "error", ok: false, error: e?.message ?? "fail", ms: Math.round(performance.now() - t0) });
       toast.error("Call failed", { description: e?.message });
     } finally {
       setRunning(false);
@@ -181,29 +201,31 @@ export function RandomApiPanel({ compact = false }: Props) {
     let okCount = 0;
     for (let i = 1; i <= total; i++) {
       const t0 = performance.now();
+      upsertRow(i, { stage: "created", ms: 0 });
       try {
-        const r = await callPaidRandom(key);
+        const r = await callPaidRandom(key, (e) =>
+          upsertRow(i, {
+            stage: e.stage,
+            paymentId: e.paymentId,
+            amount: e.amount,
+            error: e.error,
+            ms: Math.round(performance.now() - t0),
+          })
+        );
         const ms = Math.round(performance.now() - t0);
         okCount++;
         setLatest(r);
-        setResults((prev) => [
-          {
-            idx: i,
-            ok: true,
-            random: r.random,
-            txHash: r.txHash,
-            amount: r.amountPaid,
-            settlementNumber: r.settlementNumber,
-            ms,
-          },
-          ...prev,
-        ].slice(0, 60));
+        upsertRow(i, {
+          stage: "settled",
+          ok: true,
+          random: r.random,
+          txHash: r.txHash,
+          amount: r.amountPaid,
+          settlementNumber: r.settlementNumber,
+          ms,
+        });
       } catch (e: any) {
-        const ms = Math.round(performance.now() - t0);
-        setResults((prev) => [
-          { idx: i, ok: false, error: e?.message ?? "fail", ms },
-          ...prev,
-        ].slice(0, 60));
+        upsertRow(i, { stage: "error", ok: false, error: e?.message ?? "fail", ms: Math.round(performance.now() - t0) });
       }
       setBulkProgress({ done: i, total });
     }
