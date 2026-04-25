@@ -14,6 +14,8 @@ export const HEALTH_URL = `${FUNCTIONS_BASE}/health`;
 export const REVOKE_KEY_URL = `${FUNCTIONS_BASE}/revoke-key`;
 export const ADD_FUNDS_URL = `${FUNCTIONS_BASE}/add-funds`;
 export const M2M_TRADE_URL = `${FUNCTIONS_BASE}/m2m-trade`;
+export const RANDOM_CHALLENGE_URL = `${FUNCTIONS_BASE}/random-challenge`;
+export const RANDOM_PAY_URL = `${FUNCTIONS_BASE}/random-pay`;
 
 async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
