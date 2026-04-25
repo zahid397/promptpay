@@ -104,8 +104,10 @@ export function ChatPanel({ onSessionStats, apiKey: extKey, onApiKeyChange, onCh
     try {
       const res = await createWallet();
       setApiKey(res.apiKey);
-      toast.success("Account created · 10 USDC funded", {
-        description: "Key saved locally.",
+      toast.success(
+        res.rotated ? "API key rotated" : `Wallet provisioned · ${res.balanceFormatted ?? "10 USDC"} funded`,
+        {
+          description: `${res.walletId}${res.arcAddress ? ` · ${res.arcAddress.slice(0, 10)}…` : ""}`,
         action: {
           label: "Copy key",
           onClick: () => {
