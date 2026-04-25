@@ -73,6 +73,27 @@ export function ChatPanel({ onSessionStats, apiKey: extKey, onApiKeyChange, onCh
   }, [chat.sessionSettlements, chat.sessionUsdcPaid, chat.currentTokens, onSessionStats]);
 
   useEffect(() => {
+    if (!onChatState) return;
+    // Aggregate all settlements across the current session (last assistant msg has them)
+    const lastAssistant = [...chat.messages].reverse().find((m) => m.role === "assistant");
+    const settlements = lastAssistant?.settlements ?? [];
+    onChatState({
+      streaming: chat.streaming,
+      reconnecting: chat.reconnecting,
+      tokens: chat.currentTokens,
+      settlements,
+      lastSettlementAt: chat.latestSettlement?.timestamp ?? null,
+    });
+  }, [
+    chat.streaming,
+    chat.reconnecting,
+    chat.currentTokens,
+    chat.latestSettlement,
+    chat.messages,
+    onChatState,
+  ]);
+
+  useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
