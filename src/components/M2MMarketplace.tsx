@@ -41,19 +41,73 @@ const SERVICES = [
 
 type ServiceKey = (typeof SERVICES)[number]["key"];
 
-export function M2MMarketplace({ apiKey }: Props) {
+export function M2MMarketplace({ apiKey, onApiKeyChange }: Props) {
   const [service, setService] = useState<ServiceKey>("weather");
   const [rounds, setRounds] = useState(3);
   const [running, setRunning] = useState(false);
   const [trades, setTrades] = useState<M2MTrade[]>([]);
   const [newBalance, setNewBalance] = useState<number | null>(null);
+  const [localKey, setLocalKey] = useState(apiKey || "");
+  const [showKey, setShowKey] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
 
   const selected = SERVICES.find((s) => s.key === service)!;
 
-  const start = async () => {
+  // Sync external key in
+  useEffect(() => {
+    if (apiKey && apiKey !== localKey) setLocalKey(apiKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey]);
+
+  // Hydrate from localStorage on mount if nothing provided
+  useEffect(() => {
     if (!apiKey) {
+      const saved = localStorage.getItem(LS_KEY);
+      if (saved) {
+        setLocalKey(saved);
+        onApiKeyChange?.(saved);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const commitKey = (k: string) => {
+    setLocalKey(k);
+    if (k.trim()) localStorage.setItem(LS_KEY, k.trim());
+    onApiKeyChange?.(k.trim());
+  };
+
+  const pasteKey = async () => {
+    try {
+      const text = (await navigator.clipboard.readText()).trim();
+      if (!text) return toast.error("Clipboard is empty");
+      commitKey(text);
+      toast.success("Key pasted");
+    } catch {
+      toast.error("Could not read clipboard");
+    }
+  };
+
+  const provisionKey = async () => {
+    setProvisioning(true);
+    try {
+      const r = await createWallet();
+      commitKey(r.apiKey);
+      toast.success("New wallet · 10 USDC funded", {
+        description: "Key generated and stored locally.",
+      });
+    } catch (e: any) {
+      toast.error("Provision failed", { description: e?.message });
+    } finally {
+      setProvisioning(false);
+    }
+  };
+
+  const start = async () => {
+    const key = localKey.trim();
+    if (!key) {
       toast.error("API key required", {
-        description: "Paste your wallet API key first to fund the buyer agent.",
+        description: "Paste your wallet API key or click Generate to fund a new one.",
       });
       return;
     }
@@ -61,7 +115,7 @@ export function M2MMarketplace({ apiKey }: Props) {
     setTrades([]);
     setNewBalance(null);
     try {
-      const res = await runM2MTrade({ apiKey, service, rounds });
+      const res = await runM2MTrade({ apiKey: key, service, rounds });
       setTrades(res.trades);
       setNewBalance(res.newBalance);
       const ok = res.trades.filter((t) => t.ok).length;
