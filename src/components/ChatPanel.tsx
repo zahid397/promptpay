@@ -7,12 +7,19 @@ interface Props {
   onSessionStats: (s: { settlements: number; usdc: number; tokens: number }) => void;
   apiKey?: string;
   onApiKeyChange?: (k: string) => void;
+  onChatState?: (state: {
+    streaming: boolean;
+    reconnecting: boolean;
+    tokens: number;
+    settlements: SettlementEvent[];
+    lastSettlementAt: string | null;
+  }) => void;
 }
 
 const LS_KEY = "promptpay.apiKey";
 const LS_URL = "promptpay.gatewayUrl";
 
-export function ChatPanel({ onSessionStats, apiKey: extKey, onApiKeyChange }: Props) {
+export function ChatPanel({ onSessionStats, apiKey: extKey, onApiKeyChange, onChatState }: Props) {
   const [apiKey, setApiKeyState] = useState("");
   const setApiKey = (k: string) => {
     setApiKeyState(k);
