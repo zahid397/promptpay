@@ -12,6 +12,7 @@ export const END_SESSION_URL = `${FUNCTIONS_BASE}/end-session`;
 export const STATS_URL = `${FUNCTIONS_BASE}/stats-snapshot`;
 export const HEALTH_URL = `${FUNCTIONS_BASE}/health`;
 export const REVOKE_KEY_URL = `${FUNCTIONS_BASE}/revoke-key`;
+export const ADD_FUNDS_URL = `${FUNCTIONS_BASE}/add-funds`;
 
 async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
@@ -39,7 +40,7 @@ export async function createWallet(): Promise<CreateWalletResponse> {
       headers: { ...(await authHeaders()), "Content-Type": "application/json" },
       body: JSON.stringify({}),
     },
-    { toastLabel: "Create account" }
+    { toastLabel: "Create wallet" }
   );
 }
 
@@ -95,6 +96,18 @@ export async function revokeKey(keyId: string): Promise<{ success: boolean }> {
   );
 }
 
+export async function addFunds(walletId: string, amount: number): Promise<{ success: boolean; balance: number; amount: number }> {
+  return jsonFetch(
+    ADD_FUNDS_URL,
+    {
+      method: "POST",
+      headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+      body: JSON.stringify({ walletId, amount }),
+    },
+    { toastLabel: "Add funds" }
+  );
+}
+
 export interface StatsSnapshot {
   totalTx: number;
   totalUsdc: number;
@@ -136,13 +149,11 @@ export interface HealthResponse {
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
-  // Don't toast on health check failures — handled by indicator color
   const res = await fetchWithRetry(
     HEALTH_URL,
     { method: "GET", headers: await authHeaders() },
     { retries: 1, baseDelayMs: 300 }
   );
-  // 503 still returns valid JSON (degraded)
   return res.json();
 }
 
@@ -158,6 +169,7 @@ export async function streamChat(opts: {
   signal?: AbortSignal;
   sessionId?: string;
   resume?: boolean;
+  model?: string;
 }): Promise<Response> {
   const url = opts.gatewayUrl || CHAT_URL;
   return fetch(url, {
@@ -171,6 +183,7 @@ export async function streamChat(opts: {
       messages: opts.messages,
       sessionId: opts.sessionId,
       resume: opts.resume,
+      model: opts.model,
     }),
     signal: opts.signal,
   });
