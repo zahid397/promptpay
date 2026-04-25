@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { callPaidRandom, createWallet, type RandomPayResponse } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 const LS_KEY = "promptpay.apiKey";
 
@@ -47,10 +48,33 @@ export function RandomApiPanel({ compact = false }: Props) {
   const [results, setResults] = useState<Result[]>([]);
   const [latest, setLatest] = useState<RandomPayResponse | null>(null);
 
-  // Hydrate key
+  // Hydrate key — prefer DB (active wallet for signed-in user), fallback to localStorage
   useEffect(() => {
-    const saved = localStorage.getItem(LS_KEY);
-    if (saved) setApiKey(saved);
+    let cancelled = false;
+    (async () => {
+      const saved = localStorage.getItem(LS_KEY);
+      if (saved && saved.startsWith("pp_")) {
+        if (!cancelled) setApiKey(saved);
+      }
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      if (!uid) return;
+      const { data } = await supabase
+        .from("users")
+        .select("api_key, revoked_at")
+        .eq("auth_user_id", uid)
+        .is("revoked_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled && data?.api_key) {
+        setApiKey(data.api_key);
+        localStorage.setItem(LS_KEY, data.api_key);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const commitKey = (k: string) => {
