@@ -5,6 +5,7 @@ import { Wallet, DollarSign, Bot, ShieldCheck, Send, Eye } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCardLg, Panel } from "@/components/PageCard";
 import { HackathonChat } from "@/components/HackathonChat";
+import { RandomApiPanel } from "@/components/RandomApiPanel";
 import { useRealtimeTx } from "@/hooks/useRealtimeTx";
 import { useStats } from "@/hooks/useStats";
 import { createWallet } from "@/lib/api";
