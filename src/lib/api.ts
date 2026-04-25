@@ -299,9 +299,20 @@ export async function payAndGetRandom(opts: {
   );
 }
 
-/** Convenience: full 3-step flow → challenge → mock arc create → /random-pay */
+/** Convenience: full 3-step flow → challenge → mock arc create → /random-pay.
+ *  Auto-retries once with a fresh challenge if the paymentId was already
+ *  consumed (HTTP 409) — happens on rapid double-clicks / StrictMode replays. */
 export async function callPaidRandom(apiKey: string): Promise<RandomPayResponse> {
-  const challenge = await fetchRandomChallenge();
-  await arcCreatePayment(challenge);
-  return payAndGetRandom({ apiKey, paymentId: challenge.paymentId });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const challenge = await fetchRandomChallenge();
+    await arcCreatePayment(challenge);
+    try {
+      return await payAndGetRandom({ apiKey, paymentId: challenge.paymentId });
+    } catch (e: any) {
+      const msg = String(e?.message ?? "");
+      if (attempt === 0 && /already consumed|409/i.test(msg)) continue;
+      throw e;
+    }
+  }
+  throw new Error("callPaidRandom: exhausted retries");
 }
