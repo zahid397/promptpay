@@ -43,24 +43,6 @@ const Auth = () => {
   };
 
 
-
-  const handleGoogle = async () => {
-    setLoading(true);
-    try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-      });
-      if (result.error) throw result.error;
-      if (result.redirected) return;
-      toast.success("Signed in with Google");
-      navigate("/");
-    } catch (e: any) {
-      toast.error("Google sign-in failed", { description: e?.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleForgot = async () => {
     if (!email) {
       toast.error("Enter your email first");
